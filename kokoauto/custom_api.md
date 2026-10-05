@@ -2,7 +2,7 @@
 
 Документация за публичните endpoint-и от `api/front/Get.php` + схеми на върнатите обекти. Използва се от АИ за изграждане на фронтенд.
 
-> Всички endpoint-и са **GET**. Не изискват auth (за разлика от admin endpoint-ите).
+> Всички endpoint-и са **GET**. Не изискват вход на потребител (за разлика от admin endpoint-ите), освен където изрично е отбелязано (напр. `favourites`).
 > Source: `projects/kokoauto/api/front/Get.php` (в devcore repo-то)
 
 ---
@@ -195,16 +195,19 @@
 ---
 
 ### 2.12. `GET /kokoauto_cars_categories`
-Йерархична категоризация на автомобили (групи системи/възли: „Пневматична система", „Спирачна система", ...).
+Дървото на категориите части — менюто („Спирачна система" → „Спирачни накладки", ...).
 
 | Param | Тип | Описание |
 |-------|-----|----------|
-| `id` | int | Връща една категория. |
+| `id` | int | Връща една категория (пълен обект, вкл. `tecdoc_nodes`). |
+| `type_id` | int | Задължителен, ако няма `car_id`. **Внимание:** сървърът го презаписва на `0`, така че в момента за всеки `type_id` идва едно и също дърво. |
+| `car_id` | int | Само категориите, вързани към колата (през `kokoauto_cars_categories_href`). |
 | `parent_id` | int | **Специален режим** — извиква външното Parts API (`partsapi.autochina.mk` чрез [`KokoAutoPartsApi::getSearchTree`](#kokoautopartsapi-външно-api)). Изисква и `car_id`. Връща поддърво за категория + конкретен автомобил. |
-| `car_id` | int | Задължителен ако е подаден `parent_id`. Може и самостоятелно като филтър — тогава JOIN-ва към `kokoauto_cars_categories_href` и връща категориите за този автомобил. |
-| `type_id` | int | **Задължителен** в стандартния режим (без `parent_id`). |
 
-**Връща:** [`KokoAutoCarsCategories`](#kokoautocarscategories) (single) или плосък масив.
+**Връща (без `id` и `parent_id`):** **дърво** — масив от корените (`level = 1`, `parent_id = 0`), всеки с децата си в `subcats` (рекурсивно). Всеки възел е [`KokoAutoCarsCategories`](#kokoautocarscategories).
+
+- В дървото `tecdoc_nodes` винаги е `[]` — мапингът към TecDoc не се зарежда, за да е бързо менюто.
+- Категория без снимка има празен `image` (`id: 0`, `url: ""`) — обектът винаги го има.
 
 > Бележка: при `parent_id` обектите идват от външен източник и `id`-тата им са `nodeId` от Parts API-то, а `title` идва от `nodeName`. Полета `date_created`/`date_updated` отсъстват.
 
@@ -212,6 +215,200 @@
 
 ### 2.13. `GET /brands` (не е част от KokoAuto)
 Endpoint от `Brands` класа на core-а. Включен е в Get.php, но не е част от KokoAuto домейна. Не го документираме тук.
+
+---
+
+## 2A. Продукти и каталог
+
+Продуктите са части от TecDoc каталога, които се продават през нашите доставчици (Inter Cars и др.). Всеки артикул се идентифицира с **`id_code`** = `"<brandNo>::<artNo>"` (напр. `"81::H97W08"`) — с него се отварят детайлът, кросовете и OE номерата. Връща се като `id_code` във всеки [`Product`](#product).
+
+Цените са **с ДДС**, в €.
+
+### 2.14. `GET /kokoauto_products` — листинг за кола + категория
+Частите от дадена категория, които пасват на дадена кола.
+
+| Param | Тип | Default | Описание |
+|-------|-----|---------|----------|
+| `car_id` | int | — | **Задължителен.** Колата (`KokoAutoCar.id`). |
+| `category_id` | int | — | **Задължителен.** Листова категория (`is_leaf = 1`). |
+| `page` | int | 1 | Страница. |
+| `limit` / `per_page` | int | 20 | Брой на страница. |
+| `brands` | CSV int | — | Само тези брандове (`brandNo`), напр. `30,81`. |
+| `available` (или `in_stock`) | `1` | — | Само наличните. Без него идват всички — **наличните първи**, после тези без наличност. |
+| `criteria[<id>]` | string \| string[] | — | Филтър по характеристика (стойност от `filters.criteria[].values[].value`). Няколко стойности на един критерий = ИЛИ; различни критерии = И. |
+| `criteria_min[<id>]`, `criteria_max[<id>]` | number | — | Числов диапазон по характеристика (за тези с `num_min`/`num_max`). |
+| `min_price`, `max_price` | number | — | Ценови диапазон. |
+
+**Връща:**
+```ts
+{
+  pagination:   Pagination,
+  ancestorNode: object | null,     // служебно (от PartsAPI), фронтът не го ползва
+  truncated:    bool,              // служебно
+  brands:       BrandFacet[],      // брандовете в целия набор (преди филтъра по бранд)
+  filters: {
+    criteria:   CriteriaFilter[],  // характеристиките с наличните стойности
+    price:      { min: number, max: number }   // граници за slider-а (от целия набор)
+  },
+  result:       Product[]
+}
+```
+
+> Първото отваряне на нова комбинация кола + категория може да отнеме няколко секунди (данните се дърпат от PartsAPI и се кешират). Следващите са бързи (~1 s за 50 продукта).
+
+---
+
+### 2.15. `GET /kokoauto_products?id_code=…` — детайл на продукт
+
+| Param | Тип | Описание |
+|-------|-----|----------|
+| `id_code` | string | **Задължителен.** `"<brandNo>::<artNo>"`. |
+| `car_id` | int | По желание — колата, от която идва потребителят. |
+
+**Връща:** един [`Product`](#product) (не е в масив). Спрямо листинга има и детайлни полета: `criteria`, `cars`, `car_external_ids` (виж схемата). Непознат артикул → празен продукт с `id: 0`.
+
+---
+
+### 2.16. `GET /kokoauto_aftermarket_products` — алтернативи (кросове)
+Взаимнозаменяеми части от други брандове — за блока „Алтернативи" в детайла.
+
+| Param | Тип | Описание |
+|-------|-----|----------|
+| `id_code` | string | **Задължителен.** Артикулът, за който търсим заместители. |
+
+**Връща:** плосък масив `Product[]` — най-много по един артикул на бранд, само такива, които продаваме. За оригинални (OE) части винаги `[]`.
+
+> Прави заявка към PartsAPI → ~1–2 s. Ако някой от кросовете още го няма при нас, първото отваряне е по-бавно.
+
+---
+
+### 2.17. `GET /kokoauto_oe_numbers` — оригинални номера
+OE номерата на автопроизводителите (BMW, FORD, ...), на които отговаря артикулът.
+
+| Param | Тип | Описание |
+|-------|-----|----------|
+| `id_code` | string | **Задължителен.** |
+
+**Връща:** плосък масив [`OeNumber[]`](#oenumber). За самите OE части — `[]`.
+
+---
+
+### 2.18. `GET /kokoauto_brand_categories` — категориите на бранд
+Нашите категории, в които даден бранд има части (за страницата на бранда).
+
+| Param | Тип | Default | Описание |
+|-------|-----|---------|----------|
+| `brand_id` | int | — | **Задължителен.** `brandNo` (= `Product.brand_id`). |
+| `type` | int | 1 | 1 = леки, 2 = товарни. |
+
+**Връща:** дърво като [`/kokoauto_cars_categories`](#212-get-kokoauto_cars_categories) — корени със `subcats`, но в `subcats` са **само** листата, в които брандът има части.
+
+---
+
+### 2.19. `GET /kokoauto_brand_products` — продукти на бранд в категория (без кола)
+
+| Param | Тип | Default | Описание |
+|-------|-----|---------|----------|
+| `brand_id` | int | — | **Задължителен.** |
+| `category_id` | int | — | **Задължителен.** Листова категория (от `kokoauto_brand_categories`). |
+| `type` | int | 1 | 1 = леки, 2 = товарни. |
+| `page` | int | 1 | |
+| `limit` / `per_page` | int | 50 | |
+| `criteria[...]`, `criteria_min[...]`, `criteria_max[...]` | | | Като в `kokoauto_products`. |
+
+**Връща:**
+```ts
+{
+  pagination: Pagination,
+  filters:    CriteriaFilter[],   // ВНИМАНИЕ: плосък масив (не {criteria, price}) и само за текущата страница
+  result:     Product[]
+}
+```
+Няма филтри по наличност и цена.
+
+---
+
+### 2.20. `GET /kokoauto_search` — глобалната търсачка
+
+| Param | Тип | Default | Описание |
+|-------|-----|---------|----------|
+| `q` | string | — | Текстът. **Под 3 символа → всички групи идват празни** (без търсене). |
+| `limit` | int | 10 | Брой на група. |
+| `page` | int | 1 | Страница (еднаква за всички групи). |
+| `category_id` | int | — | Само за `products` — стеснява до категория. |
+| `min_price`, `max_price` | number | — | Само за `products`. |
+
+**Връща** обект с група за всеки домейн:
+```ts
+{
+  brands:     Brands[],                  // брандове части
+  makers:     KokoAutoCarMaker[],        // марки коли (само фокус-марките)
+  series:     KokoAutoCarModelSeries[],  // модели (в админа: „Модел")
+  models:     KokoAutoCarModel[],        // купета (в админа: „Купе")
+  cars:       KokoAutoCar[],             // модификации — по име И по код на двигателя
+  categories: KokoAutoCarsCategories[],  // само листови категории
+  products: {
+    pagination: Pagination,
+    brands:     BrandFacet[],
+    categories: KokoAutoCarsCategories[], // категориите, в които има намерени продукти
+    filters:    { criteria: CriteriaFilter[], price: { min, max } },
+    result:     Product[]
+  }
+}
+```
+- Групите извън `products` са **плоски масиви** (без `pagination`). В момента `limit` реално ограничава само `cars` и `products` — останалите групи връщат всички съвпадения.
+- Търсенето е по начало на дума: „bmw x" намира „BMW X3", но не „BMW iX".
+- `products` идват от външното PartsAPI → търсенето отнема **от 3 до 30 s** при широки заявки (напр. „bosch"). Показвай отделно зареждане за продуктите.
+
+---
+
+### 2.21. `GET /products` — общ списък продукти (напр. „Най-продавани")
+
+| Param | Тип | Описание |
+|-------|-----|----------|
+| `id` | int | Един продукт. |
+| `sort` | string | `sales` (най-продавани), `newest`, `oldest`, `min_price`, `max_price`, `title`, `random`, `discount`, `boost`. |
+| `page`, `limit` | int | Пагинация. |
+
+Връща само наличните продукти.
+
+**Връща:** `{ pagination: Pagination, result: Product[] }`.
+
+> `sort=sales` връща **само продукти, които вече са поръчвани**, подредени по брой продажби. Ако такива са по-малко от `limit`, идват толкова, колкото са (няма допълване със случайни).
+
+---
+
+### 2.22. `GET /favourites` — любими 🔒
+**Изисква вход** (Bearer токен на потребителя).
+
+Любимите продукти на потребителя, включително без наличност. Параметри: `page`, `limit`.
+
+**Връща:** `{ pagination: Pagination, result: Product[] }`.
+
+---
+
+### 2.23. `GET /promotions` — промоции
+
+| Param | Тип | Описание |
+|-------|-----|----------|
+| `id` | int | Една промоция. |
+
+Без `id` връща само активните и валидни към момента промоции (без вътрешните за регистрация).
+
+**Връща:** плосък масив [`FrontPromo[]`](#frontpromo) (или един обект при `id`).
+
+---
+
+### 2.24. `GET /product_comments` — отзиви
+
+| Param | Тип | Описание |
+|-------|-----|----------|
+| `product_id` | int | Отзивите за продукта. |
+| `rating` | int | Само с тази оценка. |
+
+Връща само одобрените (`status_id = 1`) коментари с `type = "global"`.
+
+**Връща:** плосък масив [`Comment[]`](#comment).
 
 ---
 
@@ -460,8 +657,19 @@ Endpoint от `Brands` класа на core-а. Включен е в Get.php, н
   level:        int,            // 1 = root, 2 = ...
   is_leaf:      int,            // 0 | 1
   type_id:      int,            // тип на автомобила, за който важи категорията
+  focus:        bool,
   title:        string,
-  description:  string,
+  image: {                      // винаги го има; без снимка → id: 0, url: ""
+    id:           int,
+    object_id:    int,          // = id на категорията
+    filename:     string,
+    sort_order:   int,
+    date_created: datetime,
+    url:          string,       // пълен URL на снимката
+    url_10x10:    string        // миниатюра
+  },
+  subcats:      KokoAutoCarsCategories[],  // децата — само в дървото
+  tecdoc_nodes: object[],       // мапинг към TecDoc — вътрешно; в дървото винаги []
   date_created: datetime,
   date_updated: datetime
 }
@@ -488,14 +696,194 @@ Endpoint от `Brands` класа на core-а. Включен е в Get.php, н
 
 ---
 
+### Pagination
+```ts
+{
+  total_results:    int,
+  total_pages:      int,
+  current_page:     int,
+  results_per_page: int
+}
+```
+
+---
+
+### Product
+Продукт (част). Едни и същи полета в листингите, детайла, кросовете и търсенето; някои се пълнят само в детайла (отбелязано).
+
+```ts
+{
+  id:            int,
+  type:          int,       // 8 = част от каталога (TecDoc)
+  id_code:       string,    // "<brandNo>::<artNo>" — ключът за детайл / кросове / OE номера
+  external_id:   string,    // същото като id_code
+  ref_number:    string,    // артикулният номер (artNo)
+  gen_art_no:    int,       // TecDoc тип част
+  title:         string,
+  slug:          string,
+  url:           string,    // линк към продукта на сайта, вече с ?id_code=...
+  description:   string,
+  short_body:    string,
+  seo_title, seo_description, seo_tags: string,
+
+  brand_id:      int,       // = brandNo
+  brand:         Brands,    // { id, title, images[], website, company, available_parts_count, cars_count, categories_count, ... }
+  is_oe:         bool,      // оригинална част на автопроизводителя
+
+  price_min:     number,    // цената за показване: най-ниската продажна, с промоцията
+  delivery_days: int,       // срок на доставка в дни
+  variations:    ProductVariation[],   // в kokoauto винаги 1 — цена и наличност
+  images:        ProductImage[],
+
+  categories_cache: KokoAutoCarsCategories[], // нашите категории, в които е продуктът (тук с пълния tecdoc_nodes)
+  criteria_preview: CriteriaPreview[],        // 2–3 характеристики за картата — листинг / търсене / кросове
+  criteria:         { id: int, name: string, value: string }[], // ВСИЧКИ характеристики — само в детайла
+  cars:             CompactCar[],             // колите, на които пасва — само в детайла
+  car_external_ids: int[],                    // само в детайла
+
+  barcodes:      { id, product_id, barcode }[] | string[],  // в листинга обекти, в детайла само низове
+  single_promo_active: { id, product_id, promoprice, promo_startdate, promo_enddate, active },
+
+  rating:        number,    // средна оценка от одобрените отзиви
+  isWishlisted:  bool,      // в любими ли е (за вписан потребител)
+  isNew:         bool,      // създаден през последните 30 дни
+
+  seller:        null,      // не се ползва в kokoauto
+  supplier:      null,
+  // винаги празни в kokoauto: categories, features, files, files_private, providers, quantity_discounts, subProducts
+}
+```
+
+---
+
+### ProductVariation
+```ts
+{
+  id:            string,    // = id на продукта, като низ
+  product_id:    int,
+  sku:           string,    // = id_code
+  external_id:   string,
+  price:         number,    // редовна цена
+  promoprice:    number,    // цена с промоция; 0 ако няма
+  selling_price: number,    // цената, която се плаща
+  discount:      number,    // отстъпка в %
+  qty:           number,    // налично количество (0 = няма наличност)
+  currency:      string,    // "€"
+  unit_id, unit, attributes, name, file, rec_price, delivery_price  // не се ползват
+}
+```
+
+---
+
+### ProductImage
+```ts
+{
+  id:           int,
+  object_id:    int,        // id на продукта
+  url:          string,     // пълен URL
+  url_10x10:    string,
+  external_url: string,
+  alt:          string,
+  sort_order:   int
+}
+```
+
+---
+
+### CriteriaPreview
+```ts
+{ criteria_id: int, name: string, value: string }   // напр. { 100, "страна на монтаж", "предна ос" }
+```
+
+### CriteriaFilter
+Една характеристика във филтрите на листинга.
+```ts
+{
+  criteria_id: int,
+  name:        string,
+  values:      { value: string, value_norm: string, count: int }[],  // за избор (enum)
+  num_min:     number | null,   // за числов диапазон
+  num_max:     number | null
+}
+```
+Избраната стойност се подава като `criteria[<criteria_id>]=<value>`.
+
+### BrandFacet
+```ts
+{ brandNo: int, brandName: string, articleCount: int }
+```
+
+### CompactCar
+Кола в детайла на продукт. **Внимание:** числата идват като низове.
+```ts
+{
+  id: string, external_id: string, title: string, maker: string,
+  fuel: string, body_type: string | null,
+  kw: string, kwTo: string, hp: string, hpTo: string,
+  yearFrom: string, yearTo: string      // "ГГГГММ"; "0" = няма
+}
+```
+
+### OeNumber
+```ts
+{
+  oeNumber:    string,             // напр. "3 521 840"
+  oeBrandName: string,             // напр. "FORD"
+  oeBrandId:   int,
+  maker:       KokoAutoCarMaker,   // марката с логото (logo.url)
+  product:     Product | null      // нашият оригинален артикул, ако го продаваме; иначе null
+}
+```
+
+### FrontPromo
+```ts
+{
+  id:               int,
+  type:             int,       // 1 = промокод, 2 = за всички
+  discount_type:    string,    // "percent" | "fixed" | "free_shiping"
+  discount:         number,    // % или сума
+  discount_subject: string,    // "product" | "category" | "brand" | "all_orders" | "orders_over" | "collection"
+  title:            string,
+  subtitle:         string,
+  description:      string
+}
+```
+
+### Comment
+```ts
+{
+  id:         int,
+  type:       string,       // "global"
+  subject_id: int,          // id на продукта
+  comment:    string,
+  rating:     int,
+  user_id:    int,
+  user_name:  string,
+  email:      string,
+  parent_id:  int,          // > 0 = отговор на друг коментар
+  status_id:  int,          // 1 = одобрен
+  about:      { id, url, title },   // продуктът
+  images:     object[],
+  date, date_created, date_updated: datetime
+}
+```
+
+---
+
 ## 4. Бележки за фронтенд имплементация
 
 1. **Цикличност при `KokoAutoCar`:** eager nested обектите (`model`, `engineType`, ...) са вложени в JSON-а само при single fetch (`?id=N`). При list НЕ са. Ако трябва да покажеш списък с конфигурации с имена на двигател/гориво — направи отделни заявки до съответните lookup endpoint-и (те са малко записи) и кеширай локално.
 
 2. **`title` и `description`** винаги са string — никога `null`. При липсваща стойност → `""`.
 
-3. **`yearFrom` / `yearTo`** идват като `int` или `null`. Третирай `0` като „без ограничение".
+3. **`yearFrom` / `yearTo`** са във формат `ГГГГММ` (напр. `200307` = 07.2003). Според endpoint-а идват като число или като низ — приемай и двете. `0`, `"0"` или `null` = „без ограничение".
 
 4. **Lookup типове** (`engine_types`, `fuel_types`, ...) са малко записи и не сменят често — могат да се кешират на frontend startup.
 
 5. **Категориите** имат два различни режима — локален (от нашата БД) и външен (от Parts API). Винаги подавай `type_id` в стандартния режим, и `car_id` при `parent_id`.
+
+6. **`id_code` в URL** — съдържа `::`, а артикулният номер може да има интервали (`"30::0 986 452 041"`). Винаги го кодирай с `encodeURIComponent`.
+
+7. **Цена за показване** — `price_min`. Ако `variations[0].promoprice > 0`, има промоция: зачеркната е `variations[0].price`, а отстъпката в % е `variations[0].discount`. Наличност — `variations[0].qty > 0`; срок — `delivery_days`.
+
+8. **Бавни заявки** — `kokoauto_search` (продуктите от PartsAPI, до 30 s), `kokoauto_aftermarket_products` (~1–2 s) и първото отваряне на нова кола + категория в `kokoauto_products`. Зареждай ги отделно от останалата страница и показвай индикатор.
