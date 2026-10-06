@@ -852,6 +852,26 @@ OE номерата на автопроизводителите (BMW, FORD, ...)
 }
 ```
 
+### FeatureValue
+Стойност на характеристика (`shop_features_values`). Ядреният `GET /products_features` (виж `core-v4-front.md`) и характеристиките на продукта връщат стойностите в `values[]` / `value`. **Разлика в kokoauto:** всяка стойност носи и снимка.
+```ts
+{
+  id:         int,
+  feature_id: int,
+  title:      string,
+  image: {                  // винаги го има; без снимка → id: 0, url: ""
+    id:           int,
+    object_id:    int,      // = id на стойността
+    filename:     string,
+    sort_order:   int,
+    date_created: datetime,
+    url:          string,   // пълен URL на снимката
+    url_10x10:    string    // миниатюра
+  }
+}
+```
+Снимките се качват от админа (редакция на характеристика), по една на стойност.
+
 ### FrontPromo
 ```ts
 {
