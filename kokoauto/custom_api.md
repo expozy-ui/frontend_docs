@@ -356,7 +356,7 @@ OE номерата на автопроизводителите (BMW, FORD, ...)
   }
 }
 ```
-- Групите извън `products` са **плоски масиви** (без `pagination`). В момента `limit` реално ограничава само `cars` и `products` — останалите групи връщат всички съвпадения.
+- Групите извън `products` са **плоски масиви** (без `pagination`), всяка с най-много `limit` елемента. `page` важи за всички групи освен `cars` (там винаги идват първите `limit`).
 - Търсенето е по начало на дума: „bmw x" намира „BMW X3", но не „BMW iX".
 - `products` идват от външното PartsAPI → търсенето отнема **от 3 до 30 s** при широки заявки (напр. „bosch"). Показвай отделно зареждане за продуктите.
 
@@ -396,6 +396,23 @@ OE номерата на автопроизводителите (BMW, FORD, ...)
 Без `id` връща само активните и валидни към момента промоции (без вътрешните за регистрация).
 
 **Връща:** плосък масив [`FrontPromo[]`](#frontpromo) (или един обект при `id`).
+
+#### Отстъпка „Поръчки над" (`discount_subject = "orders_over"`)
+Отстъпка за цялата поръчка, когато стоките в количката (с ДДС, след намаленията по продукти, **без доставката**) стигнат `min_amount`. Може да е автоматична (`type = 2`, без код) или промокод (`type = 1`).
+
+- **Не се комбинират** с промокод — прилага се по-голямата отстъпка.
+- Промокод „Поръчки над" под прага се отказва със съобщение „Кодът важи за поръчки над X €". Ако количката по-късно падне под прага, кодът се маха от нея.
+
+В отговора на количката (`GET /cart`) има и:
+```ts
+{
+  subtotal_goods:       number,   // стоките преди отстъпката за поръчка
+  promocode_applied:    bool,     // false, ако има код, но автоматичната отстъпка е по-изгодна
+  order_promotion:      { id, title, discount_type, discount, min_amount, amount } | null,  // приложената автоматична; amount = отстъпката в €
+  next_order_promotion: { id, title, discount_type, discount, min_amount, remaining } | null // следващият праг; remaining = колко още до него
+}
+```
+Пример за банер: `next_order_promotion` → „Добави още {remaining} € и вземи {discount}% отстъпка".
 
 ---
 
@@ -843,6 +860,7 @@ OE номерата на автопроизводителите (BMW, FORD, ...)
   discount_type:    string,    // "percent" | "fixed" | "free_shiping"
   discount:         number,    // % или сума
   discount_subject: string,    // "product" | "category" | "brand" | "all_orders" | "orders_over" | "collection"
+  min_amount:       number,    // за "orders_over": от каква стойност на стоките важи (€, с ДДС, без доставката); иначе 0
   title:            string,
   subtitle:         string,
   description:      string
@@ -858,11 +876,10 @@ OE номерата на автопроизводителите (BMW, FORD, ...)
   comment:    string,
   rating:     int,
   user_id:    int,
-  user_name:  string,
-  email:      string,
+  user_name:  string,       // имейлът на автора НЕ се връща
   parent_id:  int,          // > 0 = отговор на друг коментар
   status_id:  int,          // 1 = одобрен
-  about:      { id, url, title },   // продуктът
+  about:      [],           // за type "global" е празно — продуктът е в subject_id
   images:     object[],
   date, date_created, date_updated: datetime
 }
