@@ -295,6 +295,8 @@ OE номерата на автопроизводителите (BMW, FORD, ...)
 
 **Логото на реда е `maker.logo.url`** (марката от реда — AUDI, SEAT, …), НЕ снимката/брандът на `product`. Един и същи оригинал често идва за няколко марки (AUDI, SEAT, SKODA, VW → един продукт на VW), така че от `product` всички редове биха излезли с логото на VW.
 
+**Групи марки (VAG, PSA, …).** Ако един номер идва за 2+ марки от една група, те се връщат като **един ред** с групата: `oeBrandName: "VAG"`, `maker` = марката-група (със своето лого). Форматът на реда е същия — фронтът не прави нищо специално. Групите се задават от админа (`group_id` на марката).
+
 ---
 
 ### 2.18. `GET /kokoauto_brand_categories` — категориите на бранд
@@ -454,6 +456,7 @@ OE номерата на автопроизводителите (BMW, FORD, ...)
   external_id:   int,             // ID от външна система (ако е импортиран)
   title:         string,          // i18n през Content
   description:   string,          // i18n през Content
+  group_id:      int,             // марката-група (напр. VAG за AUDI/SEAT/SKODA/VW); 0 = без група
   date_created:  datetime,
   date_updated:  datetime,
 
@@ -849,9 +852,9 @@ OE номерата на автопроизводителите (BMW, FORD, ...)
 ```ts
 {
   oeNumber:    string,             // напр. "3 521 840"
-  oeBrandName: string,             // напр. "FORD"
+  oeBrandName: string,             // напр. "FORD"; при група — името на групата ("VAG")
   oeBrandId:   int,
-  maker:       KokoAutoCarMaker,   // марката с логото (logo.url)
+  maker:       KokoAutoCarMaker,   // марката с логото (logo.url); при група — марката-група
   product:     Product | null      // нашият оригинален артикул, ако го продаваме (наличен при Intercars или Auto1); иначе null
 }
 ```
