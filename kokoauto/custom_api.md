@@ -291,6 +291,8 @@ OE номерата на автопроизводителите (BMW, FORD, ...)
 
 **Връща:** плосък масив [`OeNumber[]`](#oenumber). За самите OE части — `[]`.
 
+Когато продаваме оригинала (наличен при Intercars или Auto1), `product` е самият продукт → номерът трябва да е **линк към продукта** (`product.url` / `product.id`). При `product: null` номерът е само текст.
+
 ---
 
 ### 2.18. `GET /kokoauto_brand_categories` — категориите на бранд
@@ -848,7 +850,7 @@ OE номерата на автопроизводителите (BMW, FORD, ...)
   oeBrandName: string,             // напр. "FORD"
   oeBrandId:   int,
   maker:       KokoAutoCarMaker,   // марката с логото (logo.url)
-  product:     Product | null      // нашият оригинален артикул, ако го продаваме; иначе null
+  product:     Product | null      // нашият оригинален артикул, ако го продаваме (наличен при Intercars или Auto1); иначе null
 }
 ```
 
