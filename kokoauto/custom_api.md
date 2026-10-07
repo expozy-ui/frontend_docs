@@ -458,6 +458,7 @@ OE номерата на автопроизводителите (BMW, FORD, ...)
   description:   string,          // i18n през Content
   is_group:      bool,            // марката е група (VAG, PSA, …)
   group_id:      int,             // групата на марката (напр. VAG за AUDI/SEAT/SKODA/VW); 0 = без група
+  group:         { id: int, title: string } | [],   // името на групата; [] без група
   date_created:  datetime,
   date_updated:  datetime,
 
