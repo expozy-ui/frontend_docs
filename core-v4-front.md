@@ -928,9 +928,10 @@ Params:
 - Returns: `{ url: "<payment url>" }`
 
 ### POST /?route=returns
-- Auth: none
-- Body: `option_id`, `condition_id`, `orders_items_id`
-- Returns: process result with created [Returns](#returns) record
+- Auth: Bearer (logged user) — **breaking:** previously no auth
+- Body: `option_id` (int, required, from `returns_options`), `condition_id` (int, required, from `returns_conditions`), `orders_items_id` (int, required — `order_item_id` from the order's `products[]`), optional `iban`, `iban_name`, `note`
+- Returns: `{ status: 1, obj: <Returns>, msg }` — new record has `status_id=1`
+- Errors: 403 `Login first v4!` without token; `{ status: 0, error: "Access Denied" }` when the order item does not exist or its order is not the current user's; `{ status: 0, errors: { '[name="…"]': … } }` for missing params
 
 ### POST /?route=revisions
 - Auth: Bearer + superAdmin
