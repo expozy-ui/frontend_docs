@@ -465,8 +465,14 @@ When a route accepts `query_id` for single-record reads, it is written as `id=<i
 
 ### GET /?route=orders
 - Auth: Bearer
-- Params: optional `id=<int>` (delegates to `order`)
+- Params: optional `id=<int>` (delegates to `order`), optional `returnable=1` (same as `returnable_orders`)
 - Returns: single [Order](#order) or paginated [Order](#order) list for current user (default limit 1000)
+
+### GET /?route=returnable_orders
+- Auth: Bearer (logged user)
+- Params: none
+- Returns: flat list of [Order](#order) of the current user that still have at least one returnable item. Only orders with `status_id` 5 (sent) or 7 (completed); period = 14 days from `date_delivered`, or, while `date_delivered` is empty, up to 30 days from `date_created` (the client then enters `date_received` in the return form).
+  Extra fields filled only here: `returnable_until` (Y-m-d, `''` when `date_delivered` is empty) and `products[].returnable_qty` (quantity minus already requested, non-rejected returns; 0 = inactive item). Negative rows (from completed returns) always have `returnable_qty: 0`.
 
 ### GET /?route=pages
 - Auth: none
@@ -626,12 +632,32 @@ Params:
 ### GET /?route=returns_conditions
 - Auth: none
 - Params: optional `id=<int>`
-- Returns: single return-condition record or flat list (`ReturnsConditions`)
+- Returns: single [ReturnsNomenclature](#returnsnomenclature) or flat list: product condition (packaged / unpacked)
 
 ### GET /?route=returns_options
 - Auth: none
 - Params: optional `id=<int>`
-- Returns: single [ReturnsOptions](#returnsoptions) or flat list
+- Returns: single [ReturnsNomenclature](#returnsnomenclature) or flat list: what the client wants. `id=1` = refund ("The value of the product"); only then `refund_method_id` is used. Other options (e.g. replacement) need no refund data.
+
+### GET /?route=returns_reasons
+- Auth: none
+- Params: optional `id=<int>`
+- Returns: single [ReturnsNomenclature](#returnsnomenclature) or flat list: reason for the return (managed in admin)
+
+### GET /?route=returns_methods
+- Auth: none
+- Params: optional `id=<int>`
+- Returns: single [ReturnsNomenclature](#returnsnomenclature) (+ `type`: `courier` | `store`) or flat list: how the goods are returned (managed in admin)
+
+### GET /?route=returns_refund_methods
+- Auth: none
+- Params: optional `id=<int>`
+- Returns: single [ReturnsNomenclature](#returnsnomenclature) or flat list. Fixed ids: `1` bank transfer (needs `iban`, `iban_name`, `bank_name`), `2` cash on delivery (only with a `courier` return method), `3` cash in store (only with a `store` return method).
+
+### GET /?route=returns
+- Auth: Bearer (logged user)
+- Params: optional `id=<int>`: only own requests (403 `Access Denied` otherwise)
+- Returns: single [Returns](#returns) or flat list of the current user's return requests
 
 ### GET /?route=saas_templates
 - Auth: none
@@ -928,10 +954,28 @@ Params:
 - Returns: `{ url: "<payment url>" }`
 
 ### POST /?route=returns
-- Auth: Bearer (logged user) — **breaking:** previously no auth
-- Body: `option_id` (int, required, from `returns_options`), `condition_id` (int, required, from `returns_conditions`), `orders_items_id` (int, required — `order_item_id` from the order's `products[]`), optional `iban`, `iban_name`, `note`
-- Returns: `{ status: 1, obj: <Returns>, msg }` — new record has `status_id=1`
-- Errors: 403 `Login first v4!` without token; `{ status: 0, error: "Access Denied" }` when the order item does not exist or its order is not the current user's; `{ status: 0, errors: { '[name="…"]': … } }` for missing params
+- Auth: Bearer (logged user)
+- **Breaking (2026-10-14):** one request for one or more items with quantities; `orders_items_id` is removed.
+- Body (JSON or form):
+  - `order_id` int, required
+  - `items` int[], required: `order_item_id` values from the order's `products[]`
+  - `qty` object, required: `{ "<order_item_id>": count }`, `1 ... returnable_qty`
+  - `option_id` int, required: from `returns_options`
+  - `condition_id` int, required: from `returns_conditions`
+  - `return_method_id` int, required: from `returns_methods`
+  - `refund_method_id` int: required only when `option_id = 1` (refund); must match the return method type (`2` only with `courier`, `3` only with `store`)
+  - `iban`, `iban_name`, `bank_name` string: required when `refund_method_id = 1`
+  - `date_received` Y-m-d: required when the order has no `date_delivered`; must be between the order date and today
+  - `reason_id` int, optional: from `returns_reasons`
+  - `note` string, optional: free text (reason details)
+  - `names`, `phone`, `email`, `city`, `address` string, required: stored on the request
+- Example: `{"order_id":3,"items":[5,6],"qty":{"5":1,"6":1},"option_id":1,"condition_id":1,"reason_id":4,"note":"Wrong model","return_method_id":2,"refund_method_id":1,"iban":"BG80BNBG96611020345678","iban_name":"Ivan Petrov","bank_name":"DSK","date_received":"2026-10-14","names":"Ivan Petrov","phone":"0888123456","email":"test@example.com","city":"Sofia","address":"Test str. 5"}`
+- Returns: `{ status: 1, obj: <Returns>, msg }`. New request has `status_id = 1`; `obj.id` is the request number, `obj.date_created` is the submission date and time.
+- Errors:
+  - 403 `Login first v4!` without token
+  - `{ status: 0, error: "Access Denied" }`: order not found / not the user's / not in status 5 or 7, or an item is not from this order
+  - `{ status: 0, error: "<period expired>" }`: the 14-day period (or 30 days from the order without `date_delivered`) has passed
+  - `{ status: 0, errors: { '[name="<field>"]': '<text>' } }`: field errors; quantity errors use `[name="qty[<order_item_id>]"]`
 
 ### POST /?route=revisions
 - Auth: Bearer + superAdmin
@@ -1708,7 +1752,9 @@ Source: `lib/classes/shop/order/class.order.php` (or `lib/classes/shop/class.ord
 - tracking_number: string
 - promocode_id: int
 - mobileApp: int
+- date_delivered: string|null  (set when the order becomes status 7 completed)
 - total_price: float
+- returnable_until: string  (Y-m-d, only in returnable_orders)
 - seller_id: int
 - status: OrderStatus
 - address: UserAddress
@@ -1831,6 +1877,7 @@ Source: `lib/classes/shop/product/class.product.php`
 - total: float  (used in orders/cart)
 - warehouse_id: int  (used in orders/cart)
 - order_item_id: int  (used in orders)
+- returnable_qty: float  (only in returnable_orders)
 - rating: int
 - files: array
 - files_private: array
@@ -2131,27 +2178,45 @@ Source: `lib/classes/rental/class.rentalType.php`
 - date_updated
 
 ### Returns
-Source: `lib/classes/returns/class.returns.php`
-- id: int
-- product_id: int
-- shop_orders_items_id: int
+Source: `lib/classes/returns/class.returns.php`: return request (header); items are in `items`
+- id: int: request number
 - order_id: int
 - user_id: int
-- status_id: int
+- status_id: int: 1 new request, 2 awaiting payment, 3 paid, 4 disapproved, 5 waiting, 6 done, 7 received
 - option_id: int
 - condition_id: int
-- date_created
-- date_paid
-- iban: string
-- iban_name: string
+- reason_id: int (0 = none)
+- return_method_id: int
+- refund_method_id: int (0 when the option is not refund)
+- date_created: string: submission date and time
+- date_received: string|null (Y-m-d)
+- date_paid: string|null
+- names, phone, email, city, address: string
+- iban, iban_name, bank_name: string
 - note: string
-- Constants: COMPLETED_STATUSES=[3, 6]
+- product_id, shop_orders_items_id: int: legacy, first item only; use `items`
+- stock_returned, order_reduced: int (0/1): internal flags
+- date_updated: string|null
+- items: [ReturnsItems](#returnsitems)[]
+- status, option, condition, reason, return_method, refund_method: [ReturnsNomenclature](#returnsnomenclature)
+- Constants: RETURN_DAYS=14, RETURN_MAX_DAYS_FROM_ORDER=30, ORDER_STATUSES=[5, 7], COMPLETED_STATUSES=[3, 6]
 
-### ReturnsOptions
-Source: `lib/classes/returns/class.returnsOptions.php`
+### ReturnsItems
+Source: `lib/classes/returns/class.returnsItems.php`
+- id: int
+- return_id: int
+- order_item_id: int
+- product_id: int
+- qty: float
+- date_created: string
+- product: `{ id, id_code, title }` (ProductInfoSimple)
+
+### ReturnsNomenclature
+Shape of `ReturnsStatuses`, `ReturnsOptions`, `ReturnsConditions`, `ReturnsReasons`, `ReturnsMethods`, `ReturnsRefundMethods`
 - id: int
 - title: string
 - date_created: string
+- type: string: only `ReturnsMethods`: `courier` | `store`
 
 ### SaasFrontendTemplates
 Source: `lib/classes/saas_other/frontTemplates/class.saas.front.templates.php`
