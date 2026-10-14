@@ -469,6 +469,7 @@ When a route accepts `query_id` for single-record reads, it is written as `id=<i
 - Returns: single [Order](#order) or paginated [Order](#order) list for current user (default limit 1000)
 
 ### GET /?route=returnable_orders
+- Full returns guide (flow, rules, form checklist): `core-v4-returns.md`
 - Auth: Bearer (logged user)
 - Params: none
 - Returns: flat list of [Order](#order) of the current user that still have at least one returnable item. Only orders with `status_id` 5 (sent) or 7 (completed); period = 14 days from `date_delivered`, or, while `date_delivered` is empty, up to 30 days from `date_created` (the client then enters `date_received` in the return form).
