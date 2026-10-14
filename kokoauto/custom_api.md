@@ -286,8 +286,10 @@ Endpoint от `Brands` класа на core-а. Включен е в Get.php, н
 
 **Оригиналите** се познават по `is_oe: true`. Един оригинал е **един елемент**, дори да е за много марки; номерата му са в `oe_numbers` — `OeNumber[]` без `product`, **слети по групи марки**: номер за AUDI, VW, SEAT, SKODA, CUPRA идва като един ред `oeBrandName: "VAG"` с `maker` = марката-група (с логото ѝ); марки извън група (напр. MAN) са отделни редове. При aftermarket елементите `oe_numbers` е `[]`.
 
+**`brand` на оригинала — по групата.** Ако марката на оригинала е в група (VW, AUDI, SEAT, … → VAG), тук `brand.title` е името на групата (`"VAG"`), а `brand.images` — логото ѝ. `brand.id` остава на марката (напр. 9000030 = VW) → линкът към страницата на марката води към VW. Само в този endpoint; в детайла и навсякъде другаде продуктът си е VW.
+
 ```json
-{ "id": 1368220, "is_oe": true, "brand": { "title": "VW" }, "price_min": 20.41,
+{ "id": 1368220, "is_oe": true, "brand": { "id": 9000030, "title": "VAG", "images": [{ "url": "…/car_makers/logos/253/…webp" }] }, "price_min": 20.41,
   "oe_numbers": [
     { "oeNumber": "03N115562B", "oeBrandName": "VAG", "oeBrandId": 253, "maker": { "...": "марката-група" } },
     { "oeNumber": "03N115562B", "oeBrandName": "MAN", "oeBrandId": 69, "maker": { "...": "MAN" } }
