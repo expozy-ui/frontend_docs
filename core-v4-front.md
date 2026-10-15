@@ -2194,7 +2194,8 @@ Source: `lib/classes/returns/class.returns.php`: return request (header); items 
 - date_paid: string|null
 - names, phone, email, city, address: string
 - iban, iban_name, bank_name: string
-- note: string
+- note: string: customer's text
+- admin_note: string: shop's note to the customer (shown in the approved / rejected email); may be empty
 - product_id, shop_orders_items_id: int: legacy, first item only; use `items`
 - stock_returned, order_reduced: int (0/1): internal flags
 - date_updated: string|null

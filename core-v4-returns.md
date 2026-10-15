@@ -187,7 +187,8 @@ Titles come translated in `status.title` — show them as they are. The shop can
 | `date_paid` | string \| null | set by the shop |
 | `names`, `phone`, `email`, `city`, `address` | string | |
 | `iban`, `iban_name`, `bank_name` | string | empty unless bank refund |
-| `note` | string | customer's text; the shop may overwrite it with its own note |
+| `note` | string | customer's text (as submitted) |
+| `admin_note` | string | shop's note to the customer — e.g. the reason for a rejection; also sent in the approved / rejected email. Show it in "My returns" when not empty |
 | `items` | array | `[{ id, return_id, order_item_id, product_id, qty, date_created, product: { id, id_code, title } }]` |
 | `status`, `option`, `condition`, `reason`, `return_method`, `refund_method` | object | `{ id, title, date_created }` (`return_method` also has `type`); `id: 0` when not set |
 | `product_id`, `shop_orders_items_id` | int | legacy (first item) — use `items` |
