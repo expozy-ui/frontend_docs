@@ -15,6 +15,8 @@
 3. The response contains the request number (`obj.id`) and the submission date and time (`obj.date_created`) — show both.
 4. The shop processes the request in the admin (status changes). The customer follows it in the profile → `GET returns`.
 
+Emails are sent by the backend — the frontend does not send anything: on `POST returns` the shop gets a "new request" email and the customer a confirmation with the full request and the submission date/time; later the customer gets an email when the goods are received (status 7), when the request is rejected (status 4, with `admin_note`) and when it is approved (first time in status 3 or 6). Emails go out in the site's default language.
+
 ---
 
 ## 2. Rules (enforced by the server)
