@@ -70,6 +70,9 @@ Authorization: Bearer <token>
 | `GET /maevia_purposes` | предназначение (мултиселект) |
 | `GET /maevia_protections` | охрана (мултиселект) |
 | `GET /maevia_extras` | екстри (мултиселект) |
+| `GET /maevia_equipments` | уреди и обзавеждане при наем (мултиселект); има и `icon` — име на иконата от набора на сайта, може да е празно |
+| `GET /maevia_tenant_types` | „подходящ за" при наем — семейство, двойка, фирма, студенти (мултиселект) |
+| `GET /maevia_rent_terms` | вид наем: `1` дългосрочен, `2` краткосрочен. Фиксиран списък, връща само `{id, title}` |
 
 Всеки от тях приема и `?id=5` за единичен запис.
 
@@ -202,11 +205,13 @@ GET /maevia_estates_map        → леки данни за пиновете н�
 |---|---|
 | `discounted=1` | само с намалена цена |
 | `with_garage=1` | поне един гараж |
+| `available_until=2026-12-01` | наем „свободен до дата": свободните веднага (`available_from` празно) и тези със `available_from` до подадената дата включително |
 
 #### Мултиселект (през номенклатурните връзки)
 
 `heating_ids`, `exterior_ids`, `exhibition_ids`, `purpose_ids`,
-`protection_ids`, `extra_ids` — всеки приема списък: `extra_ids=[1,3]`.
+`protection_ids`, `extra_ids`, `equipment_ids`, `tenant_type_ids` — всеки
+приема списък: `extra_ids=[1,3]`.
 
 #### По дата
 
@@ -304,10 +309,25 @@ weights, encumbrances, ceiling, warehouse, basement, technical_passport, estate_
 ideal_parts_flag, deposited, commissioned, management, with_presentation, transparent,
 our_apartment, personal_offer, offer_from_other_agency, for_advertising`.
 
+**Условия за наем** (идват при всяка обява; смислени са при `kind = "rent"`):
+
+| Поле | Тип | Какво е |
+|---|---|---|
+| `deposit_months` | int | депозит в брой наеми; `0` = не е посочен. Първоначално плащане = `price × (1 + deposit_months)` |
+| `min_term_months` | int | минимален срок на договора в месеци; `0` = не е посочен |
+| `rent_term_id` | int | вид наем (`GET /maevia_rent_terms`); `0` = не е посочен |
+| `rent_term` | object\|null | същото, разгънато: `{"id": 1, "title": "Дългосрочен"}`; `null` при `rent_term_id = 0` |
+| `available_from` | date\|null | `"2026-12-01"`; `null` или минала дата = свободен веднага → таг „Свободен", иначе „Свободен от 01.12" |
+| `smoking_allowed` | 0/1 | пушенето е разрешено |
+| `utilities_estimate` | int | ориентировъчни режийни, € на месец; `0` = не е посочено |
+| `notarized_contract` | 0/1 | договор с нотариална заверка |
+
+Комисионата за наемателя не е публична и не идва в отговора.
+
 Само в детайла (`/{id}`): `complex` и `building` (обектите, ако обявата
 е в комплекс), `photos[]`, `ai_images[]`, `architectures[]`, `price_list`,
 `heating_ids[]`, `exterior_ids[]`, `exhibition_ids[]`, `purpose_ids[]`,
-`protection_ids[]`, `extra_ids[]`.
+`protection_ids[]`, `extra_ids[]`, `equipment_ids[]`, `tenant_type_ids[]`.
 
 `ai_images[]` са генерираните с „AI интериор" визуализации (виж §11) — стоят
 ОТДЕЛНО от `photos[]`, за да може фронтът да ги отдели, ако потрябва. Носят
@@ -337,12 +357,12 @@ GET /maevia_price_histories?estate_id=4
 
 | Поле | Тип | Какво е |
 |---|---|---|
-| `price` | float | редовната цена (`price`) към момента на промяната, в евро |
+| `price` | float | реалната цена към момента на промяната (намалената, ако има, иначе редовната), в евро |
 | `date_created` | datetime | кога е записана |
 
-Запис се прави при създаване на обявата и при всяка смяна на `price`.
-**Намалението (`price_discounted`) не влиза в историята** — за него ползвай
-полетата на самата обява.
+Запис се прави при създаване на обявата и при всяка смяна на реалната цена —
+т.е. и при ново намаление. Същите записи пускат и имейлите „цената е
+променена" до потребителите с обявата в любими.
 
 Грешки: без `estate_id` → `{"status": 0, "errors": {"[name=\"estate_id\"]": "Моля, въведете"}}`;
 неактивна или несъществуваща обява → HTTP 404 `{"status": 0}`.
@@ -445,8 +465,16 @@ DELETE /maevia_search_logs/{id}    → изтриване на свое
 
 **Подаване на обява:** приемат се само полетата от белия списък — вид имот и сделка,
 квартал, площи, стаи, етаж, година, цена, адресни полета, YouTube/виртуална разходка,
-заглавие, описание и мултиселектите. Всичко останало (статус, ВИП, брокер, топ оферта,
+заглавие, описание, мултиселектите и условията за наем (`deposit_months`,
+`min_term_months`, `rent_term_id`, `available_from` във формат `YYYY-MM-DD` или празно,
+`smoking_allowed`, `utilities_estimate`, `notarized_contract`, `equipment_ids`,
+`tenant_type_ids`). Всичко останало (статус, ВИП, брокер, топ оферта,
 вътрешни цени) се игнорира, дори да го пратиш.
+
+Грешки по условията за наем: непознат `rent_term_id` или невалидна дата в
+`available_from` → `{"status": 0, "[name=\"rent_term_id\"]": "..."}` (съответно
+`available_from`); отрицателни `deposit_months` / `min_term_months` /
+`utilities_estimate` → същата грешка по полето.
 
 Задължителни при създаване: `type_id`, `listing_type_id`, `neighborhood_id`.
 Ако видът имот има конфигурация `fields`, тя добавя свои задължителни полета
