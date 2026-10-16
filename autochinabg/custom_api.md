@@ -764,14 +764,25 @@ POST/DELETE тялото е `application/x-www-form-urlencoded` или `multipar
 {
   "interest": { "new": 7.95, "used": 8.95 },
   "min_months": 12, "max_months": 60, "default_months": 60, "months_step": 1,
-  "min_down_payment_percent": 10, "max_down_payment_percent": 60, "default_down_payment_percent": 30,
+  "min_down_payment_percent": 20, "max_down_payment_percent": 60, "default_down_payment_percent": 30,
   "down_payment_step": 1,
-  "down_payment_tiers": [ { "price_from": 100000, "min_percent": 50 } ],
+  "down_payment_tiers": [
+    { "price_from": 100000, "min_percent": 50 },
+    { "price_from": 50000,  "min_percent": 40 },
+    { "price_from": 0,      "min_percent": 20 }
+  ],
   "min_residual_percent": 10, "max_residual_percent": 40, "default_residual_percent": 20, "residual_step": 1,
   "min_price": 5000, "max_price": 250000,
   "examination_fee_percent": 1.5, "vat_divider": 1.2
 }
 ```
+
+`down_payment_tiers` — минималната първоначална вноска според цената на колата. Проверяват се отгоре надолу и важи
+първият праг, за който `цена >= price_from`: от 100 000 → 50%, от 50 000 → 40%, под 50 000 → 20%.
+`min_down_payment_percent` е базовият минимум (последният праг).
+
+> **Промяна (2026-10-16):** базовият минимум е вдигнат от 10% на **20%**. Слайдерът за първоначална вноска не бива
+> да позволява под 20%; по-ниска стойност при `POST /cars_leasing_applications` връща грешка от калкулатора.
 
 ### Справочни
 
