@@ -73,6 +73,10 @@ Authorization: Bearer <token>
 | `GET /maevia_equipments` | уреди и обзавеждане при наем (мултиселект); има и `icon` — име на иконата от набора на сайта, може да е празно |
 | `GET /maevia_tenant_types` | „подходящ за" при наем — семейство, двойка, фирма, студенти (мултиселект) |
 | `GET /maevia_rent_terms` | вид наем: `1` дългосрочен, `2` краткосрочен. Фиксиран списък, връща само `{id, title}` |
+| `GET /maevia_views` | гледки — към планината, парк, града (мултиселект) |
+| `GET /maevia_distance_kinds` | видове места в „Разстояния до важни места" — метро, спирка, училище… Има и `icon` |
+| `GET /maevia_energy_classes` | енергиен клас: `1` A+, `2` A, `3` B … `8` G. Фиксиран списък, само `{id, title}` |
+| `GET /maevia_finish_levels` | степен на завършеност: `1` тухла, `2` БДС — шпакловка и замазка, `3` до ключ. Фиксиран списък, само `{id, title}` |
 
 Всеки от тях приема и `?id=5` за единичен запис.
 
@@ -210,8 +214,11 @@ GET /maevia_estates_map        → леки данни за пиновете н�
 #### Мултиселект (през номенклатурните връзки)
 
 `heating_ids`, `exterior_ids`, `exhibition_ids`, `purpose_ids`,
-`protection_ids`, `extra_ids`, `equipment_ids`, `tenant_type_ids` — всеки
-приема списък: `extra_ids=[1,3]`.
+`protection_ids`, `extra_ids`, `equipment_ids`, `tenant_type_ids`, `view_ids` —
+всеки приема списък: `extra_ids=[1,3]`.
+
+Сингъл селектите по фиксирани списъци работят като точна стойност:
+`energy_class_id=3`, `finish_level_id=3`, `rent_term_id=1`.
 
 #### По дата
 
@@ -324,10 +331,44 @@ our_apartment, personal_offer, offer_from_other_agency, for_advertising`.
 
 Комисионата за наемателя не е публична и не идва в отговора.
 
+**Сградата, броячи и таг „Ново"** (при всяка обява):
+
+| Поле | Тип | Какво е |
+|---|---|---|
+| `energy_class_id` | int | енергиен клас (`GET /maevia_energy_classes`); `0` = не е посочен |
+| `energy_class` | object\|null | същото, разгънато: `{"id": 3, "title": "B"}` |
+| `finish_level_id` | int | степен на завършеност (`GET /maevia_finish_levels`); `0` = не е посочена |
+| `finish_level` | object\|null | `{"id": 3, "title": "До ключ"}` |
+| `views_count` | int | отваряния на публичния детайл. Всяко `GET /maevia_estates/{id}` го вдига с 1 (и отговорът вече носи новата стойност); списъците не броят. Под прага от настройките не го показвай |
+| `is_new` | 0/1 | `1`, ако обявата е добавена преди по-малко от 14 дни — за тага „Ново" и в списъците |
+
 Само в детайла (`/{id}`): `complex` и `building` (обектите, ако обявата
 е в комплекс), `photos[]`, `ai_images[]`, `architectures[]`, `price_list`,
 `heating_ids[]`, `exterior_ids[]`, `exhibition_ids[]`, `purpose_ids[]`,
-`protection_ids[]`, `extra_ids[]`, `equipment_ids[]`, `tenant_type_ids[]`.
+`protection_ids[]`, `extra_ids[]`, `equipment_ids[]`, `tenant_type_ids[]`,
+`view_ids[]`, `highlights[]`, `distances[]`, `inquiries_30d`.
+
+| Поле | Тип | Какво е |
+|---|---|---|
+| `highlights[]` | array | акценти под описанието, в реда за показване: `{id, estate_id, sort, title}` |
+| `distances[]` | array | разстояния до важни места: `{id, estate_id, kind_id, kind, label, meters, sort}`; `kind` = `{id, title, icon, …}` от `/maevia_distance_kinds`; `label` е надпис по желание („Метростанция Опълченска") — ако е празен, показвай `kind.title` |
+| `inquiries_30d` | int | запитвания („Искам инфо" + „Искам оглед") за последните 30 дни. Броят се от 16.10.2026 нататък — по-старите запитвания не са вързани за обява |
+
+```json
+{
+  "energy_class": {"id": 3, "title": "B"},
+  "finish_level": {"id": 3, "title": "До ключ"},
+  "views_count": 4, "is_new": 0, "inquiries_30d": 0,
+  "view_ids": [3],
+  "highlights": [
+    {"id": 7, "estate_id": 6, "sort": 1, "title": "Офис сграда клас А"}
+  ],
+  "distances": [
+    {"id": 3, "estate_id": 6, "kind_id": 1, "label": "Метростанция Опълченска", "meters": 450, "sort": 1,
+     "kind": {"id": 1, "title": "Метро", "icon": "", "sort": 1, "active": 1}}
+  ]
+}
+```
 
 `ai_images[]` са генерираните с „AI интериор" визуализации (виж §11) — стоят
 ОТДЕЛНО от `photos[]`, за да може фронтът да ги отдели, ако потрябва. Носят
@@ -468,13 +509,19 @@ DELETE /maevia_search_logs/{id}    → изтриване на свое
 заглавие, описание, мултиселектите и условията за наем (`deposit_months`,
 `min_term_months`, `rent_term_id`, `available_from` във формат `YYYY-MM-DD` или празно,
 `smoking_allowed`, `utilities_estimate`, `notarized_contract`, `equipment_ids`,
-`tenant_type_ids`). Всичко останало (статус, ВИП, брокер, топ оферта,
+`tenant_type_ids`), както и `energy_class_id`, `finish_level_id`, `view_ids`,
+`highlights[]` (списък текстове; празните се пропускат, до 10) и `distances`
+(`distances[0][kind_id]`, `distances[0][label]`, `distances[0][meters]` …; ред без
+вид или без метри се пропуска). `highlights` / `distances` заменят изцяло
+досегашните; празен низ ги изчиства, а липсващ ключ ги оставя непроменени.
+`views_count` не може да се пише отвън. Всичко останало (статус, ВИП, брокер, топ оферта,
 вътрешни цени) се игнорира, дори да го пратиш.
 
 Грешки по условията за наем: непознат `rent_term_id` или невалидна дата в
 `available_from` → `{"status": 0, "[name=\"rent_term_id\"]": "..."}` (съответно
 `available_from`); отрицателни `deposit_months` / `min_term_months` /
-`utilities_estimate` → същата грешка по полето.
+`utilities_estimate` → същата грешка по полето. Непознат `energy_class_id` или
+`finish_level_id` → `{"status": 0, "[name=\"energy_class_id\"]": "..."}` (съответно).
 
 Задължителни при създаване: `type_id`, `listing_type_id`, `neighborhood_id`.
 Ако видът имот има конфигурация `fields`, тя добавя свои задължителни полета
