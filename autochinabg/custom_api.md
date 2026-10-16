@@ -767,8 +767,8 @@ POST/DELETE тялото е `application/x-www-form-urlencoded` или `multipar
   "min_down_payment_percent": 20, "max_down_payment_percent": 60, "default_down_payment_percent": 30,
   "down_payment_step": 1,
   "down_payment_tiers": [
-    { "price_from": 100000, "min_percent": 50 },
-    { "price_from": 50000,  "min_percent": 40 },
+    { "price_from": 100000, "min_percent": 20 },
+    { "price_from": 50000,  "min_percent": 20 },
     { "price_from": 0,      "min_percent": 20 }
   ],
   "min_residual_percent": 10, "max_residual_percent": 40, "default_residual_percent": 20, "residual_step": 1,
@@ -778,11 +778,12 @@ POST/DELETE тялото е `application/x-www-form-urlencoded` или `multipar
 ```
 
 `down_payment_tiers` — минималната първоначална вноска според цената на колата. Проверяват се отгоре надолу и важи
-първият праг, за който `цена >= price_from`: от 100 000 → 50%, от 50 000 → 40%, под 50 000 → 20%.
+първият праг, за който `цена >= price_from`. В момента всички прагове са **20%** — минимумът не зависи от цената.
 `min_down_payment_percent` е базовият минимум (последният праг).
 
-> **Промяна (2026-10-16):** базовият минимум е вдигнат от 10% на **20%**. Слайдерът за първоначална вноска не бива
-> да позволява под 20%; по-ниска стойност при `POST /cars_leasing_applications` връща грешка от калкулатора.
+> **Промяна (2026-10-16):** минималната първоначална вноска е **20% за всички цени** (беше 10% / 40% от 50 000 / 50% от 100 000).
+> Слайдерът не бива да позволява под 20%; по-ниска стойност при `POST /cars_leasing_applications` връща грешка от калкулатора.
+> Структурата `down_payment_tiers` остава, за да може праговете да се върнат без промяна по фронта.
 
 ### Справочни
 
