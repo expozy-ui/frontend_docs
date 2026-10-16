@@ -479,6 +479,9 @@ year_of_construction, website, youtube_link, virtual_tour_link, sort`, плюс:
   `{id, object_id, filename, url, url_10x10, taken_on, caption, sort_order, date_created}`
 - `progress_updated` — датата на най-новата снимка (`"2026-10-10"`) за
   „Последна актуализация"; `null`, ако няма снимки
+- `contact_office` — само при проект **без брокер** (`broker_id = 0`): офисът,
+  отбелязан като „Отдел ново строителство" (формат като `GET /maevia_offices`).
+  `null`, ако проектът има брокер или няма отбелязан офис
 
 Инвеститор/архитект/строител, етапи с дати и схеми на плащане още не са в
 API-то — чакат решение.
@@ -632,8 +635,37 @@ POST /maevia_job_application   {city: sofia|varna|burgas, names, phone, email?, 
 Други публични:
 
 ```
-GET /maevia_brokers    → брокери (видимите, по приоритет): {id, name, job_title, email, phone, image}
+GET /maevia_brokers         → брокери (видимите, по приоритет)
+GET /maevia_brokers?id=5    → един брокер
+GET /maevia_offices         → активните офиси (по sort)
+GET /maevia_offices?id=2    → един офис; неактивен/несъществуващ → 404
+GET /maevia_offices?is_new_construction=1  → „Отдел ново строителство"
 ```
+
+**Брокер:** `{id, name, job_title, email, phone, image, office_id, office,
+language_ids, languages}`.
+
+| Поле | Тип | Какво е |
+|---|---|---|
+| `office_id` | int | офисът на брокера; `0` = без офис |
+| `office` | object\|null | офисът, разгънат (формат като по-долу) — за секция „Консултант" |
+| `language_ids` | int[] | езиците, които говори (`GET /maevia_languages`) |
+| `languages` | array | същите, разгънати: `[{"id": 1, "title": "Български", "code": "bg", …}, {"id": 2, "title": "English", "code": "en", …}]` — за реда „Български · English" |
+
+**Офис:**
+
+| Поле | Тип | Какво е |
+|---|---|---|
+| `id`, `title` | int, string | заглавие („Офис София") |
+| `address` | string | адрес |
+| `latitude`, `longitude` | float | координати за карта; `0` = не са въведени |
+| `working_hours` | string | работното време, както се изписва („Пон – Нед · 09:00 – 19:00 …") |
+| `phone`, `email` | string | контакти — резервните, когато обявата няма брокер |
+| `is_new_construction` | 0/1 | „Отдел ново строителство" — най-много един офис е `1` |
+| `sort`, `active` | int | подредба; публично излизат само активните |
+
+Обявата сочи към брокера с `broker_id`; офисът и езиците идват от брокера.
+Проект без брокер носи контактите на отдела в `contact_office` (виж §5).
 
 ---
 
