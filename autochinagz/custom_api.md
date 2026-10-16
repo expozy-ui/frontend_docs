@@ -182,8 +182,8 @@ POST/DELETE тялото е `application/x-www-form-urlencoded` или `multipar
 
 ### `GET /cars_auctions` 🔓
 
-Каталогът на обявите. Пагиниран `CarsAuctionFrontend[]`. Връща само статуси **Scheduled (5)** и **Live (6)**.
-**[gz]** Свалените от продавача (`hidden = true`) **също излизат** — подай `hidden=0` (виж [т.16](#16-известни-проблеми)).
+Каталогът на обявите. Пагиниран `CarsAuctionFrontend[]`. Връща само статуси **Scheduled (5)** и **Live (6)**;
+свалените от продавача (`hidden`) не излизат.
 
 | Параметър | Тип | Описание |
 |---|---|---|
@@ -203,7 +203,6 @@ POST/DELETE тялото е `application/x-www-form-urlencoded` или `multipar
 | `city` | string | LIKE |
 | `exterior_color` | string | точно съвпадение |
 | `featured` | 0/1 | |
-| `hidden` | 0/1 | **[gz]** `hidden=0` скрива свалените от продавача |
 | `buy_now` | 1 | само с buy-now цена (аукциони) |
 | `order_by` | string | `price`, `year`, `mileage`, `date_created`, `date_end` + `order_direction`; или съкратено `price_desc`, `year_asc`… По подразбиране — най-скоро обновените (`date_updated DESC`) |
 | `page`, `limit` | int | пагинация |
@@ -447,7 +446,7 @@ POST/DELETE тялото е `application/x-www-form-urlencoded` или `multipar
 | `POST /my_cars_auctions_hidden` | `auction_id`, `hidden` (0/1, задълж.) | сваля/връща обявата от сайта; статусът не се пипа | `{ status: 1, msg, obj }` |
 | `POST /my_cars_auctions_bump` | `auction_id` | вдига обявата напред в каталога (обновява `date_updated`) | `{ status: 1, msg, obj, date_updated }` |
 | `POST /my_cars_auctions_transfer` | `auction_id`, `seller_id` (= user_id на търговеца) | прехвърля обявата на друг активен търговец. Сделките/заявките/огледите остават при стария. Обява със заявка не се мести. Подписът се трие. | `{ status: 1, msg, obj }` |
-| `POST /cars_auctions_republish` | `auction_id` | **[gz]** само за обява в Ended (7); копие без бидове, сделки, дати; копието е в **Pending review (1)** — и за резервационни (виж т.16) | `{ status: 1, obj }` |
+| `POST /cars_auctions_republish` | `auction_id` | **[gz]** само за обява в Ended (7); копие без бидове, сделки, дати; резервационна → **Live (6)** за 30 дни, аукцион → **Pending review (1)** | `{ status: 1, auction_id }` — id на новото копие |
 | `DELETE /cars_auctions/<id>` | | изтрива обява: аукцион — само в 0/2; резервационна — и в 6 | `{ status: 1 }` |
 
 Грешки: `_BC_ERR_AUCTION_NO_ACCESS`, `_BC_ERR_AUCTION_NOT_FOUND`, `_BC_ERR_AUCTION_RESERVED_REQUIRED`, `_BC_ERR_AUCTION_HIDDEN_REQUIRED`,
@@ -659,7 +658,7 @@ POST/DELETE тялото е `application/x-www-form-urlencoded` или `multipar
 |---|---|---|---|
 | `POST /cars_auctions_bids` 🔒 | `auction_id`, `amount` | бид по Активен аукцион | `{ status: 1, obj }`; `_BC_ERR_BID_AUCTION_NOT_LIVE`, `_BC_ERR_BID_OWN_AUCTION`, `_BC_ERR_BID_NO_CLIENT_PROFILE`, `_BC_ERR_BID_NO_DEPOSIT`, `_BC_ERR_BID_AMOUNT_TOO_LOW`, `_BC_ERR_BID_STEP_INVALID`, `_BC_ERR_NOT_AUCTION_TYPE` |
 | `POST /cars_auctions_prebids` 🔒 | `auction_id`, `amount` | pre-bid по Предстоящ аукцион (`prebid_active`) | `_BC_ERR_PREBID_NOT_SCHEDULED`, `_BC_ERR_PREBID_NOT_ENABLED`, `_BC_ERR_PREBID_OWN_AUCTION`, `_BC_ERR_PREBID_AMOUNT_TOO_LOW` |
-| `GET /my_cars_auctions_prebids?auction_id=` 🔒 | | ⚠ **не работи** — виж [т.16](#16-известни-проблеми) | |
+| `GET /my_cars_auctions_prebids?auction_id=` 🔒 | `auction_id` (int, задълж.) | pre-bid-ът на логнатия за обявата | `CarsAuctionPrebid` `{ id, auction_id, user_id, amount, date_created, date_updated }`; ако няма pre-bid — същият обект с `id: 0`, `amount: 0`, датите `null`; без `auction_id` → HTTP 400 `errors["[name=\"auction_id\"]"]` |
 | `POST /cars_auctions_buy_now` 🔒 | `auction_id` | купува аукцион на buy-now цена; аукционът приключва | `{ status: 1, msg }`; `_BC_ERR_BUYNOW_NOT_LIVE`, `_BC_ERR_BUYNOW_NOT_AVAILABLE`, `_BC_ERR_BUYNOW_OWN_AUCTION`, `_BC_ERR_BUYNOW_NO_DEPOSIT` |
 | `POST /cars_deposits` 🔒 | | депозит — Stripe checkout | `{ status: 1, deposit_id, checkout_url }` |
 | `GET /my_cars_deposits` 🔒 | | депозитите на клиента (статусът се синхронизира със Stripe) | `CarsDeposit[]` |
@@ -1068,8 +1067,5 @@ POST/DELETE тялото е `application/x-www-form-urlencoded` или `multipar
 
 | Endpoint | Проблем |
 |---|---|
-| `GET /my_cars_auctions_prebids` | PHP fatal error — `CarsAuctionPrebid::get_all_byAuctionAndUser()` не съществува. Не го ползвай, докато не бъде оправен. |
 | `GET /cars_model_specifications` без филтър | връща всички спецификации без пагинация (~90 MB). Винаги подавай `variant_id`, `model_id` или `id`. |
 | `GET /cars_model_variants`, `/moto_model_variants` без филтър | връщат всички вариации (хиляди). Подавай `model_id`. |
-| `GET /cars_auctions` | **[gz]** не скрива обявите, свалени от продавача (`hidden`). Подавай `hidden=0`. |
-| `POST /cars_auctions_republish` | **[gz]** копието на резервационна обява отива в Pending review (1), въпреки че резервационните иначе не минават през преглед. |
