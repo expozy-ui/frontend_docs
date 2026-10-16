@@ -284,6 +284,20 @@ apartment_number, latitude_approx, longitude_approx, approximate_coordinates`.
 
 Промо: `top_offer`, `vip_until` (дата или null), `priority`.
 
+**Изчислени полета** (идват и в списъка, и в детайла — не ги смятай във фронта):
+
+| Поле | Тип | Какво е |
+|---|---|---|
+| `kind` | string | вид обява: `rent` при `listing_type_id = 2`; иначе `unit` при `complex_id > 0` (имот от проект); иначе `sale` |
+| `price_effective` | float | реалната цена: `price_discounted`, ако е > 0, иначе `price` |
+| `discount_percent` | int | `round((1 − price_discounted / price) × 100)`; `0` = няма намаление |
+| `price_per_sqm` | float | вече се смята от сървъра при запис: `price_effective / total_area_sqm`, 2 знака. Само при обява без площ или без цена остава ръчно въведената стойност |
+
+```json
+{ "id": 4, "kind": "sale", "price": 129500, "price_discounted": 122000,
+  "price_effective": 122000, "discount_percent": 6, "price_per_sqm": 1967.74 }
+```
+
 25 булеви полета (0/1): `new_construction, lux, for_investments, exclusive,
 no_buyer_renter_commission, no_seller_lessor_commission, pets_allowed, transitional,
 weights, encumbrances, ceiling, warehouse, basement, technical_passport, estate_key,
@@ -306,6 +320,32 @@ our_apartment, personal_offer, offer_from_other_agency, for_advertising`.
 **Вътрешните полета не се връщат публично** (цена на собственика, комисионни,
 бележки, данни за ключа, точни координати). Публично са само приблизителните
 координати — на картата се показват те.
+
+### История на цената
+
+```
+GET /maevia_price_histories?estate_id=4
+```
+
+Само `saas_key`, без токен. Връща масив от най-старата към най-новата цена:
+
+```json
+[
+  { "price": 129500, "date_created": "2026-09-04 14:44:33" }
+]
+```
+
+| Поле | Тип | Какво е |
+|---|---|---|
+| `price` | float | редовната цена (`price`) към момента на промяната, в евро |
+| `date_created` | datetime | кога е записана |
+
+Запис се прави при създаване на обявата и при всяка смяна на `price`.
+**Намалението (`price_discounted`) не влиза в историята** — за него ползвай
+полетата на самата обява.
+
+Грешки: без `estate_id` → `{"status": 0, "errors": {"[name=\"estate_id\"]": "Моля, въведете"}}`;
+неактивна или несъществуваща обява → HTTP 404 `{"status": 0}`.
 
 ---
 
