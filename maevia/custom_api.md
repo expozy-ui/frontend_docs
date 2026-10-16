@@ -421,8 +421,10 @@ GET /maevia_price_histories?estate_id=4
 GET /maevia_complexes                     → видимите комплекси (пагинирано)
 GET /maevia_complexes?city_id=1372        → комплексите в град (през кварталите)
 GET /maevia_complexes?with_coordinates=1  → за картата
+GET /maevia_complexes?amenity_ids=1,4     → с тези удобства (мултиселект; също heating_ids)
 GET /maevia_complexes/{id}                → детайл със сгради, входове и снимки
 GET /maevia_estates?complex_id={id}       → обявите в този комплекс
+GET /maevia_building_classes              → клас на сградата: 1 стандарт, 2 висок стандарт, 3 лукс (фиксиран списък)
 ```
 
 Неактивен комплекс (`active = 0`) връща **404** на детайла и не излиза в списъка.
@@ -430,7 +432,36 @@ GET /maevia_estates?complex_id={id}       → обявите в този ком�
 Полета: `id, slug, title, description, description_short, seo_title,
 seo_description, neighborhood_id, street, street_number, block, post_code,
 latitude, longitude, broker_id, construction_id, construction_stage_id,
-year_of_construction, website, youtube_link, virtual_tour_link, sort`.
+year_of_construction, website, youtube_link, virtual_tour_link, sort`, плюс:
+
+| Поле | Тип | Какво е |
+|---|---|---|
+| `no_buyer_commission` | 0/1 | таг „Без комисиона" |
+| `exclusive` | 0/1 | таг „Ексклузивно" |
+| `gross_area_sqm` | int | РЗП, м²; `0` = не е посочено |
+| `elevators_per_entrance` | int | асансьори на вход |
+| `parking_underground`, `parking_outdoor` | int | брой паркоместа подземни / на открито |
+| `building_class_id` + `building_class` | int + object\|null | `{"id": 2, "title": "Висок стандарт"}` |
+| `energy_class_id` + `energy_class` | int + object\|null | енергиен клас (`/maevia_energy_classes`) |
+| `finish_level_id` + `finish_level` | int + object\|null | степен на завършеност (`/maevia_finish_levels`) |
+
+**Агрегати от активните имоти в проекта** — идват и в списъка, и в детайла,
+така че картите на /proekti не искат отделна заявка за всеки проект:
+
+| Поле | Тип | Какво е |
+|---|---|---|
+| `price_min` | float | най-ниската реална цена (намалената, ако има) сред имотите с цена > 0 |
+| `price_sqm_min`, `price_sqm_max` | float | цена на м² от–до (реалната цена / `total_area_sqm`) |
+| `area_min`, `area_max` | float | площ от–до, м² |
+| `units_total` | int | активни имоти в проекта |
+| `units_free`, `units_reserved`, `units_sold` | int | по статус на сделката (1 свободен, 2 резервиран, 3 продаден) — за лентата |
+
+Без имоти всички са `0`.
+
+**Наследяване в имота.** Имот от проекта без свой енергиен клас или степен на
+завършеност показва тези на проекта: в детайла на имота `energy_class` /
+`finish_level` идват от проекта, а `energy_class_id` / `finish_level_id`
+остават `0` (така се вижда, че стойността е наследена).
 
 Само в детайла:
 
@@ -438,6 +469,19 @@ year_of_construction, website, youtube_link, virtual_tour_link, sort`.
 - `estates_count` — брой активни обяви в комплекса
 - `buildings[]` — `{id, complex_id, title, entrances_count, sort, entrances[]}`,
   а всеки вход е `{id, building_id, title, floors_count, sort}`
+- `heating_ids[]`, `amenity_ids[]` — отопление и удобства (`/maevia_heatings`, `/maevia_amenities`)
+- `highlights[]` — „Ключови предимства": `{id, complex_id, sort, title}`
+- `distances[]` — `{id, complex_id, kind_id, kind, label, meters, sort}`, като при имота
+- `brochure`, `price_list` — `{id, object_id, filename, url, path, date_created}`;
+  без файл `id = 0` и `url = ""`
+- `architectures[]` — архитектурни планове, същият формат
+- `progress_photos[]` — снимки от строежа, най-новата първа:
+  `{id, object_id, filename, url, url_10x10, taken_on, caption, sort_order, date_created}`
+- `progress_updated` — датата на най-новата снимка (`"2026-10-10"`) за
+  „Последна актуализация"; `null`, ако няма снимки
+
+Инвеститор/архитект/строител, етапи с дати и схеми на плащане още не са в
+API-то — чакат решение.
 
 `entrances_count` е декларираният брой входове по проект — може да е
 по-голям от броя записи в `entrances[]`, ако не всички са описани.
