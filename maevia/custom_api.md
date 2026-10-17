@@ -238,7 +238,7 @@ GET /maevia_estates_map        → леки данни за пиновете н�
 GET /maevia_estates?order_by=price&order_direction=ASC
 ```
 
-Без `order_by` подредбата е **активен ВИП → топ оферта → най-нови**. При
+Без `order_by` подредбата е **топ оферта → най-нови**. При
 търсене в радиус — най-близките първо.
 
 ### Пагинация
@@ -296,7 +296,10 @@ neighborhood_id, broker_id, user_id, complex_id, building_id` — разгъва
 Адрес: `neighborhood_id, post_code, street, street_number, block, entrance,
 apartment_number, latitude_approx, longitude_approx, approximate_coordinates`.
 
-Промо: `top_offer`, `vip_until` (дата или null), `priority`.
+Промо: `top_offer` (0/1 — таг „Топ оферта" и първи в подредбата), `priority`.
+
+> **Breaking (17.10.2026):** ВИП отпада изцяло — полето `vip_until` вече не
+> съществува. Промотирането е само чрез `top_offer`.
 
 **Изчислени полета** (идват и в списъка, и в детайла — не ги смятай във фронта):
 
@@ -563,7 +566,7 @@ DELETE /maevia_search_logs/{id}    → изтриване на свое
 (`distances[0][kind_id]`, `distances[0][label]`, `distances[0][meters]` …; ред без
 вид или без метри се пропуска). `highlights` / `distances` заменят изцяло
 досегашните; празен низ ги изчиства, а липсващ ключ ги оставя непроменени.
-`views_count` не може да се пише отвън. Всичко останало (статус, ВИП, брокер, топ оферта,
+`views_count` не може да се пише отвън. Всичко останало (статус, брокер, топ оферта,
 вътрешни цени) се игнорира, дори да го пратиш.
 
 Грешки по условията за наем: непознат `rent_term_id` или невалидна дата в
