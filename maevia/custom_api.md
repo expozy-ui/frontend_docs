@@ -75,8 +75,9 @@ Authorization: Bearer <token>
 | `GET /maevia_rent_terms` | вид наем: `1` дългосрочен, `2` краткосрочен. Фиксиран списък, връща само `{id, title}` |
 | `GET /maevia_views` | гледки — към планината, парк, града (мултиселект) |
 | `GET /maevia_distance_kinds` | видове места в „Разстояния до важни места" — метро, спирка, училище… Има и `icon` |
-| `GET /maevia_amenities` | удобства в комплекса — охрана, подземен паркинг, фитнес… Има и `icon`. Изборът в проекта предстои |
-| `GET /maevia_languages` | езици, които говорят брокерите; `title` е самоназванието („English"), `code` — ISO 639-1 (`en`) за флагче. Изборът при брокера предстои |
+| `GET /maevia_amenities` | удобства в комплекса — охрана, подземен паркинг, фитнес… Има и `icon` |
+| `GET /maevia_languages` | езици, които говорят брокерите; `title` е самоназванието („English"), `code` — ISO 639-1 (`en`) за флагче |
+| `GET /maevia_companies` | фирми — инвеститори, архитекти, строители: `{id, title, url, logo, sort, active}`; `logo` = `{id, url, url_10x10, …}` или празен обект (`id = 0`) |
 | `GET /maevia_energy_classes` | енергиен клас: `1` A+, `2` A, `3` B … `8` G. Фиксиран списък, само `{id, title}` |
 | `GET /maevia_finish_levels` | степен на завършеност: `1` тухла, `2` БДС — шпакловка и замазка, `3` до ключ. Фиксиран списък, само `{id, title}` |
 
@@ -353,6 +354,12 @@ our_apartment, personal_offer, offer_from_other_agency, for_advertising`.
 `protection_ids[]`, `extra_ids[]`, `equipment_ids[]`, `tenant_type_ids[]`,
 `view_ids[]`, `highlights[]`, `distances[]`, `inquiries_30d`.
 
+**Имот от проект** (`complex_id > 0`): вложеният `complex` носи основните полета
+на проекта плюс `developer`, `architect`, `builder`, `milestones[]`,
+`payment_schemes[]` и `brochure` (същият формат като в детайла на проекта, §5) —
+за блоковете „Схеми на плащане", „Етапи", инвеститор/архитект/строител и
+брошурата, без втора заявка към проекта.
+
 | Поле | Тип | Какво е |
 |---|---|---|
 | `highlights[]` | array | акценти под описанието, в реда за показване: `{id, estate_id, sort, title}` |
@@ -486,8 +493,31 @@ year_of_construction, website, youtube_link, virtual_tour_link, sort`, плюс:
   отбелязан като „Отдел ново строителство" (формат като `GET /maevia_offices`).
   `null`, ако проектът има брокер или няма отбелязан офис
 
-Инвеститор/архитект/строител, етапи с дати и схеми на плащане още не са в
-API-то — чакат решение.
+- `developer_id`, `architect_id`, `builder_id` + разгънати `developer`,
+  `architect`, `builder` — фирмата по роля от `/maevia_companies`
+  (`{id, title, url, logo}`) или `null`. Една фирма може да е в няколко роли
+- `milestones[]` — етапите с дати, в реда на номенклатурата:
+  `{id, complex_id, construction_stage_id, stage {id, title}, date, done}`.
+  `date` е `"2025-05-01"` или `null`; `done` = 0/1. Текущият етап на проекта
+  (`construction_stage_id`) е последният с `done = 1`. Показвай месец и година
+- `payment_schemes[]` — схемите на плащане за целия проект:
+
+```json
+[
+  { "id": 1, "title": "С банков кредит", "description": "Депозит и кредит след Акт 14", "sort": 1,
+    "steps": [
+      { "label": "депозит", "percent": 0, "amount": 3000, "construction_stage_id": 0, "stage": null, "sort": 1 },
+      { "label": "при предварителен договор", "percent": 30, "amount": 0, "construction_stage_id": 0, "stage": null, "sort": 2 },
+      { "label": "кредит след Акт 14", "percent": 70, "amount": 0, "construction_stage_id": 4,
+        "stage": { "id": 4, "title": "След акт 14" }, "sort": 3 }
+    ] }
+]
+```
+
+Стъпката е **процент ИЛИ сума**: `percent > 0` → процент от цената, иначе
+`amount` в евро. Процентите в една схема дават точно 100 — рисувай ги като
+пропорционална лента; сумите (депозит) не влизат в лентата. `label` може да е
+празен — тогава ползвай `stage.title`.
 
 `entrances_count` е декларираният брой входове по проект — може да е
 по-голям от броя записи в `entrances[]`, ако не всички са описани.
@@ -627,10 +657,29 @@ GET    /maevia_wanted_matches?id=3 → съвпадащите обяви по з
 ## 9. Лийд форми (публични, без токен)
 
 ```
-POST /maevia_inquiry           {estate_id, kind: info|viewing, names, phone, email?, message?}
+POST /maevia_inquiry           {estate_id, kind: info|viewing, names, phone, email?, message?, follow?, similar?}
 POST /maevia_consultation      {names, phone, email?, message?}
 POST /maevia_job_application   {city: sofia|varna|burgas, names, phone, email?, message?, cv (файл)}
 ```
+
+**„Следи имота" и „Подобни оферти" — само за регистрирани.** Чекбоксовете във
+формата за запитване се показват само на логнат потребител; заявката тогава
+носи и `Authorization: Bearer <token>`:
+
+| Поле | Какво прави |
+|---|---|
+| `follow=1` | добавя имота в любимите (ако вече е там — нищо). Дневният крон праща имейл при промяна на цената, включително намаление |
+| `similar=1` | създава запазено търсене „Подобни на „…"" със същия вид имот и вид обява, същия квартал, цена и площ ±15 %, поне толкова стаи. Кронът праща имейл за новите обяви по него. Вижда се и се трие от `GET /my_maevia_search_logs` |
+
+Отговорът тогава има и `follow: 1` / `similar_search_id: <id>`. Без токен
+двата флага се пренебрегват — запитването минава нормално.
+
+Свързаните бутони на сайта, също само за логнат:
+
+- **„Следете цената"** в детайла = `POST /maevia_favorites {estate_id}` (вече съществува)
+- **„Известия за проекта"** = `POST /maevia_search_logs` с
+  `{"name": "Проект …", "filters": "{\"complex_id\": 5}"}` — кронът известява за
+  новите имоти в проекта
 
 Всяка форма записва брояч в статистиките и праща имейл. CV-то се праща като
 прикачен файл (multipart) и не се съхранява.
