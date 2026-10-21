@@ -71,7 +71,7 @@ index.php:
 | 4 | Категория | `products.php` | 50 продукта/стр., линкове prev/next с `?page=N`, всеки с линк към продукта |
 | 5 | Блог | `blog.php`, `post.php` | Списък с пагинация; статия с пълен текст, дата, снимка |
 | 6 | Начална | `home.php` | Категории + избрани продукти + последни статии, всичко с линкове |
-| 7 | llms.txt | преместване + `.htaccess` | `/llms.txt` и `/llms-full.txt` връщат същото като преди |
+| 7 | llms.txt + robots.txt | преместване на llms генератора + `.htaccess`; нов `core/sitemaps/robots_txt_generator.php` | `/llms.txt` и `/llms-full.txt` връщат същото като преди; `/robots.txt` има `Sitemap: https://{домейн}/sitemap` с домейна на текущия проект |
 | 8 | Документация | `README.md`, конвенции | Виж „Конвенции“ |
 
 ## Тестове (за всяка стъпка)
@@ -129,3 +129,5 @@ curl -s  https://ДОМЕЙН/bg/product/6-x                           # нор�
 27. Тест само с curl. 28. Тестов домейн ecomerce.expozy.net, авто-ъплоуд.
 29. Без тестов режим — дев среда. 30. Конвенциите се пишат накрая (стъпка 8).
 31. Планът живее във `frontend_docs/ai_version_plan.md`.
+32. `robots.txt` се генерира от PHP (`core/sitemaps/`, не в ai_version) с ред `Sitemap:` за домейна на проекта.
+33. Мерене на посещения от AI (utm_source=chatgpt.com и т.н.) — не за сега.
