@@ -11,8 +11,9 @@
 ai_version/
   .htaccess              Deny from all
   config.php             enabled, списък ботове, slug → шаблон, noindex slug-ове, лимити
-  class.ai_bot.php       AiBot::detect() — разпознаване по User-Agent
-  class.ai_render.php    помощни: чистене на HTML от Alpine, линкове, цена, лог
+  classes/
+    class.ai_bot.php     AiBot::detect() — разпознаване по User-Agent
+    class.ai_render.php  AiRender — поток, чистене на HTML от Alpine, линкове, лог
   bootstrap.php          входна точка (виж „Поток“)
   layout.php             <html>/<head>/навигация/footer около шаблона
   llms_txt_generator.php преместен от core/sitemaps/
