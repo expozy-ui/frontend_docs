@@ -233,7 +233,7 @@ Endpoint от `Brands` класа на core-а. Включен е в Get.php, н
 | `category_id` | int | — | **Задължителен.** Листова категория (`is_leaf = 1`). |
 | `page` | int | 1 | Страница. |
 | `limit` / `per_page` | int | 20 | Брой на страница. |
-| `brands` | CSV int | — | Само тези брандове (`brandNo`), напр. `30,81`. |
+| `brands` | CSV int | — | Само тези брандове (`brandNo`), напр. `30,81`. `brandNo` на група (VAG от [`BrandFacet`](#brandfacet)) връща всички нейни марки. |
 | `available` (или `in_stock`) | `1` | — | Само наличните. Без него идват всички — **наличните първи**, после тези без наличност. |
 | `criteria[<id>]` | string \| string[] | — | Филтър по характеристика (стойност от `filters.criteria[].values[].value`). Няколко стойности на един критерий = ИЛИ; различни критерии = И. |
 | `criteria_min[<id>]`, `criteria_max[<id>]` | number | — | Числов диапазон по характеристика (за тези с `num_min`/`num_max`). |
@@ -286,7 +286,7 @@ Endpoint от `Brands` класа на core-а. Включен е в Get.php, н
 
 **Оригиналите** се познават по `is_oe: true`. Един оригинал е **един елемент**, дори да е за много марки; номерата му са в `oe_numbers` — `OeNumber[]` без `product`, **слети по групи марки**: номер за AUDI, VW, SEAT, SKODA, CUPRA идва като един ред `oeBrandName: "VAG"` с `maker` = марката-група (с логото ѝ); марки извън група (напр. MAN) са отделни редове. При aftermarket елементите `oe_numbers` е `[]`.
 
-**`brand` на оригинала — по групата.** Ако марката на оригинала е в група (VW, AUDI, SEAT, … → VAG), тук `brand.title` е името на групата (`"VAG"`), а `brand.images` — логото ѝ. `brand.id` остава на марката (напр. 9000030 = VW) → линкът към страницата на марката води към VW. Само в този endpoint; в детайла и навсякъде другаде продуктът си е VW.
+**`brand` на оригинала — по групата** (както навсякъде, виж [`Product.brand`](#product)).
 
 ```json
 { "id": 1368220, "is_oe": true, "brand": { "id": 9000030, "title": "VAG", "images": [{ "url": "…/car_makers/logos/253/…webp" }] }, "price_min": 20.41,
@@ -772,6 +772,9 @@ OE номерата на автопроизводителите (BMW, FORD, ...)
 
   brand_id:      int,       // = brandNo
   brand:         Brands,    // { id, title, images[], website, company, available_parts_count, cars_count, categories_count, ... }
+                            // Оригинал на марка от група (VW, AUDI, SEAT, … → VAG): title = името на групата ("VAG"),
+                            // images = логото ѝ; id остава на марката (9000030 = VW) → линкът към страницата на марката води към VW.
+                            // Навсякъде на фронта (категории, търсене, детайл, кросове, любими); админът вижда истинската марка.
   is_oe:         bool,      // оригинална част на автопроизводителя
   oe_numbers:    OeNumber[],// само в kokoauto_aftermarket_products при оригиналите (слети по групи марки, без product); иначе []
 
@@ -855,8 +858,9 @@ OE номерата на автопроизводителите (BMW, FORD, ...)
 
 ### BrandFacet
 ```ts
-{ brandNo: int, brandName: string, articleCount: int }
+{ brandNo: int, brandName: string, articleCount: int, logo: string }   // logo = URL на логото ('' ако няма)
 ```
+**Групи марки:** оригиналите на марки от една група (VW, AUDI, … → VAG) са **един ред** — `brandName: "VAG"`, `logo` на групата, `articleCount` = сборът. `brandNo` е на една от марките; подаден във филтъра `brands=<brandNo>`, той се разширява до всички марки на групата — фронтът не прави нищо специално.
 
 ### CompactCar
 Кола в детайла на продукт. **Внимание:** числата идват като низове.
