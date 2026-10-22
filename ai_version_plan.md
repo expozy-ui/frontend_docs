@@ -18,12 +18,15 @@ ai_version/
   layout.php             <html>/<head>/навигация/footer около шаблона
   llms_txt_generator.php преместен от core/sitemaps/
   templates/
-    home.php
     products.php         категория
     product.php
     blog.php
     post.php
-    page.php             fallback — статичните страници от редактора
+    page.php             fallback — страниците от редактора (вкл. началната); apiData блоковете стават списъци
+    _product_list.php    частични шаблони (AiRender::partial), ползват се и от api_blocks
+    _post_list.php
+    _pagination.php
+    404.php, maintenance.php
     nav_only.php         checkout, cart, login… — само навигация + noindex
   lang/bg.php, en.php    етикети
   logs/                  YYYY-MM.log
@@ -71,7 +74,7 @@ index.php:
 | 3 | Продукт | `product.php` | h1, цена + промо, вариации, наличност, описание, атрибути, ≤5 снимки в пълен размер, ≤10 отзива, FAQ. Цената съвпада с Alpine версията |
 | 4 | Категория | `products.php` | 50 продукта/стр., линкове prev/next с `?page=N`, всеки с линк към продукта |
 | 5 | Блог | `blog.php`, `post.php` | Списък с пагинация; статия с пълен текст, дата, снимка |
-| 6 | Начална | `home.php` | Категории + избрани продукти + последни статии, всичко с линкове |
+| 6 | Начална | `page.php` + `config.api_blocks` | apiData="get.products" / "get.blogPosts" блоковете от редактора се заменят със списъци на мястото на `<template x-for>`, със същите параметри — без отделен home.php |
 | 7 | llms.txt + robots.txt | преместване на llms генератора + `.htaccess`; нов `core/sitemaps/robots_txt_generator.php` | `/llms.txt` и `/llms-full.txt` връщат същото като преди; `/robots.txt` има `Sitemap: https://{домейн}/sitemap` с домейна на текущия проект |
 | 8 | Документация | `README.md`, конвенции | Виж „Конвенции“ |
 
