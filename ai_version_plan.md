@@ -97,7 +97,7 @@ curl -s  https://ДОМЕЙН/bg/product/6-x                           # нор�
 
 ## Среда
 
-- Тестов домейн: https://ecomerce.expozy.net/
+- Тестов домейн: https://ecommerce.myexpozy.com/ (NetBeans качва там; ecomerce.expozy.net е друг сървър)
 - Всеки записан файл се качва автоматично → всяка стъпка е веднага на живо.
   Дев среда е, затова отделен тестов режим не е нужен (т. 29).
 
@@ -126,7 +126,7 @@ curl -s  https://ДОМЕЙН/bg/product/6-x                           # нор�
 23. JSON-LD от `GeoOptimizer::headTags()`. 24. `enabled` флаг в config.
 Разпознаване само по User-Agent, без IP проверка.
 25. Конвенциите — в `frontend_docs/frontend_framework.md`. 26. Отделен шаблон за всеки тип страница.
-27. Тест само с curl. 28. Тестов домейн ecomerce.expozy.net, авто-ъплоуд.
+27. Тест само с curl. 28. Тестов домейн ecommerce.myexpozy.com (там качва NetBeans).
 29. Без тестов режим — дев среда. 30. Конвенциите се пишат накрая (стъпка 8).
 31. Планът живее във `frontend_docs/ai_version_plan.md`.
 32. `robots.txt` се генерира от PHP (`core/sitemaps/`, не в ai_version) с ред `Sitemap:` за домейна на проекта.
