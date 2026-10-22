@@ -1,6 +1,6 @@
 ---
 name: expozy-alpine
-description: Конвенции за писане на HTML страници за Expozy SPA платформата (Alpine.js + Tailwind + custom framework layer) - window.data, apiData, alpineListeners(), callModal(), href(), пагинация, @success/@error callbacks, is-section структура, API endpoints. Използвай ЗАДЪЛЖИТЕЛНО при създаване или редакция на .html страници в Expozy проект (public_html/static/pages/**), при въпроси за alpineListeners, apiData, callModal, corePage, is-section, или когато проектът съдържа Alpine.js SPA router с #main контейнер.
+description: Конвенции за писане на HTML страници за Expozy SPA платформата (Alpine.js + Tailwind + custom framework layer) - window.data, apiData, alpineListeners(), callModal(), href(), пагинация, @success/@error callbacks, is-section структура, API endpoints. Използвай ЗАДЪЛЖИТЕЛНО при създаване или редакция на .html страници в Expozy проект (public_html/static/pages/**), при въпроси за alpineListeners, apiData, callModal, corePage, is-section, при промени по ai_version/ (PHP версията за AI ботове — раздел 24), или когато проектът съдържа Alpine.js SPA router с #main контейнер.
 ---
 Ти генерираш HTML страници за SPA платформа, базирана на Alpine.js с custom framework layer.
 Спазвай СТРИКТНО описаните програмни конвенции.
@@ -1348,3 +1348,81 @@ target_id се вади с parseInt от частта преди първото 
 
 - Ендпойнтите връщат ту плосък обект, ту {result:[…]} — нормализирай
   (виж pickModelSeo / Page::pick_model), не приемай една от двете форми.
+
+═══════════════════════════════════════════════════════════
+24. AI ВЕРСИЯ (ai_version/) — ЗАДЪЛЖИТЕЛНА ПРОВЕРКА ПРИ ВСЯКА ПРОМЯНА
+═══════════════════════════════════════════════════════════
+
+AI ботовете (GPTBot, ClaudeBot, PerplexityBot…) не изпълняват JS. Затова проектът
+има втора, опростена PHP версия на страниците в папка ai_version/ — тя се връща
+САМО на AI ботове (по User-Agent). Хората и Google/Bing/Apple получават
+нормалната Alpine страница.
+
+Пълно описание, инсталация и помощни функции: ai_version/README.md в проекта.
+
+── ТРЕТО ОГЛЕДАЛО ──
+
+Раздел 23 описва двойката page.js ↔ class.page.php (SEO). AI версията е третото
+огледало на същата страница: каквото съдържание вижда човекът в Alpine, същото
+трябва да види и AI ботът в PHP шаблона. Не повече (без скрита информация),
+не по-малко (без празни секции).
+
+── КОГА СЕ ПИПА AI ВЕРСИЯТА ──
+
+  Промяна по фронта                                   AI версия
+  ─────────────────────────────────────────────────── ───────────────────────────────────────────
+  Нов тип страница с ID в URL-а                       ЗАДЪЛЖИТЕЛНО: templates/{slug}.php +
+  (хотел, обява, аукцион, дилър…)                     ред в config.php → templates + етикети в
+                                                      lang/*.php. Плюс SEO огледалото (раздел 23).
+
+  Нова страница/секция със списък от API              ЗАДЪЛЖИТЕЛНО, ако endpoint-ът не е в
+  (apiData="get.X" + x-for)                           config.php → api_blocks: частичен шаблон
+                                                      templates/_{x}_list.php + ред в api_blocks.
+                                                      Иначе блокът просто изчезва за AI.
+
+  Ново съществено поле в съществуваща страница        Добави го в съответния шаблон
+  (цена, наличност, адрес, характеристики, дата…)     (product.php, post.php, …).
+
+  Нова статична страница (текст от редактора)         Нищо — templates/page.php я покрива.
+                                                      Само провери с curl.
+
+  Страница без съдържание за AI                       Slug-ът в config.php → noindex.
+  (кошница, профил, вход, плащане)
+
+  Само визия (CSS, layout, анимации, модали,          Нищо.
+  иконки, hover, цветове)
+
+── ЗАДЪЛЖИТЕЛЕН РЕД В КРАЯ НА ВСЯКА ЗАДАЧА ПО ФРОНТА ──
+
+  AI версия: засегната — {какво е променено в ai_version/}
+  или
+  AI версия: не е засегната — {защо: само визия / статична страница / …}
+
+Не пропускай този ред, дори когато отговорът е „не е засегната“.
+
+── ПРАВИЛА ЗА ШАБЛОНИТЕ В ai_version/templates/ ──
+
+- Чист PHP + семантичен HTML: h1–h3, p, ul/li, a, img, table. БЕЗ Alpine,
+  Tailwind класове, <script>, <style>, иконки.
+- Един <h1> на страница. HTML от редактора/API → AiRender::clean_html($html, true)
+  (true прави вложените h1 на h2).
+- Всеки изход през AiRender::e(). Етикети само през AiRender::t('ключ') +
+  lang/bg.php и lang/en.php — без текст на твърдо.
+- Данните — със същите API заявки и параметри като Alpine страницата.
+  Отговорите се нормализират с AiRender::rows() (ту плосък масив, ту {result}).
+- Цени: AiRender::price() от variations[0].selling_price (стара цена: price при
+  promoprice != 0). Наличност: сборът на variations[].qty, НЕ product.quantity.
+- Снимки: пълният URL (url), НЕ url_10x10 — тук няма lazy loading.
+- Линкове от API: AiRender::url($url) — винаги с домейна на текущия сайт.
+- Липсващ обект (изтрит продукт/статия):
+    $status = 404; echo AiRender::not_found(); return;
+- Новият шаблон е отделен файл за всеки тип страница — не правим общ шаблон,
+  управляван от конфигурация.
+
+── ТЕСТ ──
+
+  curl -s -D - -A "Mozilla/5.0 (compatible; GPTBot/1.2; +https://openai.com/gptbot)" https://ДОМЕЙН/bg/{страница}
+
+Провери: заглавка X-AI-Version: 1; статус 200 (404 за несъществуващ обект);
+в <main> няма " x-", "@click", ":href", class=; няма PHP грешки; данните
+съвпадат с Alpine страницата. И че нормалната версия (без -A) не е променена.
