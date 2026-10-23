@@ -605,6 +605,7 @@ GET  /my_maevia_estates            → моите обяви (всички ст�
 POST /maevia_estates               → нова обява (влиза "чака одобрение")
 POST /maevia_estates/{id}          → редакция на СВОЯ обява
 DELETE /maevia_estates/{id}        → архивиране на своя обява
+POST /maevia_estates_restore/{id}  → връщане на своя архивирана обява
 
 GET  /my_maevia_favorites          → любими (пагинирано)
 POST /maevia_favorites             → toggle: {estate_id} → {status, favorite: 0|1}
@@ -615,6 +616,13 @@ GET  /my_maevia_search_logs        → запазени търсения
 POST /maevia_search_logs           → {name, filters (JSON), request_uri}
 DELETE /maevia_search_logs/{id}    → изтриване на свое
 ```
+
+**Връщане от архив** (`POST /maevia_estates_restore/{id}`, без тяло): само за собственика
+и само ако обявата е архивирана (`status_id` 4). Одобрен брокер я получава веднага
+активна (2), всички останали — „чака одобрение“ (1), т.е. минава отново през модерация.
+Грешки: `Access denied` (не е твоя или не съществува), `Not archived` (не е в архива).
+Успехът връща `{status: 1, obj}` с новия `status_id`. Редакцията през
+`POST /maevia_estates/{id}` НЕ променя статуса — архивирана обява си остава архивирана.
 
 **Подаване на обява:** приемат се само полетата от белия списък — вид имот и сделка,
 квартал, площи, стаи, етаж, година, цена, адресни полета, YouTube/виртуална разходка,
