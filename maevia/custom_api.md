@@ -371,7 +371,18 @@ our_apartment, personal_offer, offer_from_other_agency, for_advertising`.
 е в комплекс), `photos[]`, `ai_images[]`, `architectures[]`, `price_list`,
 `heating_ids[]`, `exterior_ids[]`, `exhibition_ids[]`, `purpose_ids[]`,
 `protection_ids[]`, `extra_ids[]`, `equipment_ids[]`, `tenant_type_ids[]`,
-`view_ids[]`, `highlights[]`, `distances[]`, `inquiries_30d`.
+`view_ids[]`, `highlights[]`, `distances[]`, `inquiries_30d`, `documents[]`.
+
+`documents[]` — публичните документи на обявата (произволен брой, PDF, Word,
+снимки…): `{id, object_id, filename, url, path, date_created}`. Показвай
+`filename` като текст на линка към `url`; празен масив = няма документи.
+
+```json
+"documents": [
+  { "id": 3, "object_id": 6, "filename": "skica.pdf",
+    "url": "https://r2.expozy.com/maevia/maevia/estates_documents/6/skica.pdf" }
+]
+```
 
 **Имот от проект** (`complex_id > 0`): вложеният `complex` носи основните полета
 на проекта плюс `developer`, `architect`, `builder`, `milestones[]`,
