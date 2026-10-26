@@ -655,6 +655,13 @@ Params:
 - Params: optional `id=<int>`
 - Returns: single [ReturnsNomenclature](#returnsnomenclature) or flat list. Fixed ids: `1` bank transfer (needs `iban`, `iban_name`, `bank_name`), `2` cash on delivery (only with a `courier` return method), `3` cash in store (only with a `store` return method).
 
+### GET /?route=guest_returnable_order
+- Auth: none (guest, order placed without an account, `user_id = 0`)
+- Params: `number` (string, required, order number), `order_email` or `order_phone` (one of the two; email case-insensitive, phone compared by the last 9 digits)
+- Returns: single [Order](#order) with the same extra fields as `returnable_orders` (`date_delivered`, `returnable_until`, `products[].order_item_id`, `products[].returnable_qty`). Returned regardless of age/status; outside the period or not in status 5/7 every item has `returnable_qty: 0`.
+- Errors: missing `number` → `{ status: 0, errors: { '[name="number"]': ... } }`; no match (or the order belongs to a registered customer) → `{ status: 0, error: "Order not found" }`
+- Full guide: `core-v4-returns.md` (§3a)
+
 ### GET /?route=returns
 - Auth: Bearer (logged user)
 - Params: optional `id=<int>`: only own requests (403 `Access Denied` otherwise)
@@ -983,6 +990,11 @@ Params:
   - `{ status: 0, error: "Access Denied" }`: order not found / not the user's / not in status 5 or 7, or an item is not from this order
   - `{ status: 0, error: "<period expired>" }`: the 14-day period (or 30 days from the order without `date_delivered`) has passed
   - `{ status: 0, errors: { '[name="<field>"]': '<text>' } }`: field errors; quantity errors use `[name="qty[<order_item_id>]"]`
+
+### POST /?route=guest_returns
+- Auth: none (guest)
+- Body: same as `POST /?route=returns`, **without** `order_id`; instead `number` + `order_email` or `order_phone` (as in `guest_returnable_order`)
+- Returns / errors: same as `POST /?route=returns`, plus `{ status: 0, error: "Order not found" }` when the identification does not match. A guest cannot list requests (`GET returns` needs login).
 
 ### POST /?route=revisions
 - Auth: Bearer + superAdmin
