@@ -23,7 +23,7 @@ Emails are sent by the backend — the frontend does not send anything: on `POST
 
 | Rule | Value |
 |---|---|
-| Who can return | Logged-in user, only own orders; a guest — only orders placed without an account, found by order number + email or phone (§3a) |
+| Who can return | Logged-in user, only own orders; a guest — only orders placed without an account, found by order ID + email or phone (§3a) |
 | Order statuses that allow a return | `5` Sent, `7` Completed |
 | Return period | 14 days from `order.date_delivered` (set automatically when the order becomes status 7) |
 | Order without `date_delivered` (still "Sent") | Customer enters `date_received`; it must be between the order date and today. The 14 days run from it, but never later than 30 days from the order date |
@@ -163,16 +163,16 @@ The current user's return requests (array of `Returns`, §5). `GET /returns/<id>
 
 ## 3a. Guest returns (no login)
 
-For orders placed **without an account** (`user_id = 0`). The guest identifies the order by its number plus the email **or** the phone given in the order. Orders of registered customers are never found this way — they log in and use §3.
+For orders placed **without an account** (`user_id = 0`). The guest identifies the order by its **ID** (`Order.id` — the number shown in the admin and in the order emails, e.g. `#1234`) plus the email **or** the phone given in the order. **Breaking (2026-10-26):** the param was `number` (`Order.number`), now it is `order_id`. Orders of registered customers are never found this way — they log in and use §3.
 
-Flow: the guest enters the order number and an email or phone → `GET guest_returnable_order` → the same item/quantity choice and form as §3 → `POST guest_returns`. Emails are the same as for logged-in customers.
+Flow: the guest enters the order ID and an email or phone → `GET guest_returnable_order` → the same item/quantity choice and form as §3 → `POST guest_returns`. Emails are the same as for logged-in customers.
 
 ### GET /guest_returnable_order
 No Bearer.
 
 | Param | Type | Required | Notes |
 |---|---|---|---|
-| `number` | string | yes | order number (`Order.number`, e.g. `"466892"`) |
+| `order_id` | int | yes | order ID (`Order.id`, e.g. `1234`) — **not** `Order.number` |
 | `order_email` | string | one of the two | email from the order; case and surrounding spaces are ignored |
 | `order_phone` | string | one of the two | phone from the order; compared by the last 9 digits → `0888123456`, `+359 888 123 456` and `359888123456` all match |
 
@@ -183,15 +183,15 @@ Errors (`status: 0`):
 
 | Case | Response |
 |---|---|
-| No `number` | `{ "errors": { "[name=\"number\"]": "Please enter" } }` |
-| No match (wrong number, email/phone, neither given, or the order belongs to a registered customer) | `{ "error": "Order not found" }` — on purpose it does not say which field is wrong |
+| No `order_id` | `{ "errors": { "[name=\"order_id\"]": "Please enter" } }` |
+| No match (wrong order ID, email/phone, neither given, or the order belongs to a registered customer) | `{ "error": "Order not found" }` — on purpose it does not say which field is wrong |
 
 ### POST /guest_returns
-No Bearer. Same fields as `POST /returns` (§3), **except** `order_id` — instead send the order identification again:
+No Bearer. Same fields as `POST /returns` (§3), plus the order identification (`order_id` is the guest order's ID):
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `number` | string | yes | as in `guest_returnable_order` |
+| `order_id` | int | yes | as in `guest_returnable_order` |
 | `order_email` / `order_phone` | string | one of the two | as in `guest_returnable_order` |
 | `items`, `qty`, `option_id`, `condition_id`, `return_method_id`, … | | | exactly as `POST /returns` |
 | `names`, `phone`, `email`, `city`, `address` | string | yes | **contact data of the request** (pre-fill from the found order) — not the identification above |

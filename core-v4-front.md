@@ -657,9 +657,9 @@ Params:
 
 ### GET /?route=guest_returnable_order
 - Auth: none (guest, order placed without an account, `user_id = 0`)
-- Params: `number` (string, required, order number), `order_email` or `order_phone` (one of the two; email case-insensitive, phone compared by the last 9 digits)
+- Params: `order_id` (int, required, order ID — **not** `Order.number`; breaking 2026-10-26, was `number`), `order_email` or `order_phone` (one of the two; email case-insensitive, phone compared by the last 9 digits)
 - Returns: single [Order](#order) with the same extra fields as `returnable_orders` (`date_delivered`, `returnable_until`, `products[].order_item_id`, `products[].returnable_qty`). Returned regardless of age/status; outside the period or not in status 5/7 every item has `returnable_qty: 0`.
-- Errors: missing `number` → `{ status: 0, errors: { '[name="number"]': ... } }`; no match (or the order belongs to a registered customer) → `{ status: 0, error: "Order not found" }`
+- Errors: missing `order_id` → `{ status: 0, errors: { '[name="order_id"]': ... } }`; no match (or the order belongs to a registered customer) → `{ status: 0, error: "Order not found" }`
 - Full guide: `core-v4-returns.md` (§3a)
 
 ### GET /?route=returns
@@ -993,7 +993,7 @@ Params:
 
 ### POST /?route=guest_returns
 - Auth: none (guest)
-- Body: same as `POST /?route=returns`, **without** `order_id`; instead `number` + `order_email` or `order_phone` (as in `guest_returnable_order`)
+- Body: same as `POST /?route=returns` (`order_id` = the guest order's ID) + `order_email` or `order_phone` (as in `guest_returnable_order`). Breaking 2026-10-26: was `number`.
 - Returns / errors: same as `POST /?route=returns`, plus `{ status: 0, error: "Order not found" }` when the identification does not match. A guest cannot list requests (`GET returns` needs login).
 
 ### POST /?route=revisions
