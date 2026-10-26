@@ -163,7 +163,7 @@ The current user's return requests (array of `Returns`, §5). `GET /returns/<id>
 
 ## 3a. Guest returns (no login)
 
-For orders placed **without an account** (`user_id = 0`). The guest identifies the order by its **ID** (`Order.id` — the number shown in the admin and in the order emails, e.g. `#1234`) plus the email **or** the phone given in the order. **Breaking (2026-10-26):** the param was `number` (`Order.number`), now it is `order_id`. Orders of registered customers are never found this way — they log in and use §3.
+For orders placed **without an account** (`user_id = 0`). The guest identifies the order by its **ID** (`Order.id` — the number shown in the admin and in the return emails, e.g. `#1234`; order emails may show `Order.number` (`[ORDER_NO]`) depending on the template — use `[ORDER_ID]` there if guests should see the ID) plus the email **or** the phone given in the order. **Breaking (2026-10-26):** the param was `number` (`Order.number`), now it is `order_id`. Orders of registered customers are never found this way — they log in and use §3.
 
 Flow: the guest enters the order ID and an email or phone → `GET guest_returnable_order` → the same item/quantity choice and form as §3 → `POST guest_returns`. Emails are the same as for logged-in customers.
 
