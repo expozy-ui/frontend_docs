@@ -468,6 +468,42 @@ When a route accepts `query_id` for single-record reads, it is written as `id=<i
 - Params: optional `id=<int>` (delegates to `order`), optional `returnable=1` (same as `returnable_orders`)
 - Returns: single [Order](#order) or paginated [Order](#order) list for current user (default limit 1000)
 
+### GET /?route=organization
+- Auth: none
+- Params: optional `lang=<code>` (translatable fields; default = request language)
+- Purpose: company data for the `Organization` JSON-LD node. Not part of `settings`: cache it on the frontend **per language** (~1 h; on failure ~5 min). No invalidation, admin changes appear after the cache expires.
+- Returns: the object itself (not wrapped), always all 18 keys; empty value = `''` / `[]` / `{}`, never `null`:
+
+| Key | Type | Source / notes |
+|---|---|---|
+| `type` | string | `Organization` \| `OnlineStore` \| `LocalBusiness` (admin choice) |
+| `name` | string | site name |
+| `legal_name` | string | legal company name (invoice data) |
+| `vat_id` | string | VAT number, uppercase |
+| `tax_id` | string | EIK |
+| `email` | string | contact email (only a valid address) |
+| `phone` | string | contact phone, normalized (`+359888111222`) |
+| `street` | string | address (invoice data) |
+| `city` | string | city |
+| `postal_code` | string | always `''` for now |
+| `country` | string | ISO 3166-1 alpha-2 (`BG`) |
+| `contact_url` | string | contacts page: absolute `https://…` or path starting with `/` (make it absolute on the frontend) |
+| `same_as` | string[] | social links (Facebook, YouTube, Instagram, Twitter/X from settings) + extra profiles; only http(s), no duplicates |
+| `founder` | string | founder name |
+| `founding_date` | string | `YYYY` or `YYYY-MM-DD` |
+| `description` | string | translatable; falls back to the site's main language |
+| `alternate_names` | string[] | translatable, same fallback |
+| `extra` | object | extra JSON-LD properties to merge into the node (`slogan`, `priceRange`, …); never contains `@context`, `@id`, `@type`, `@graph` |
+
+- Example:
+```json
+{ "type": "OnlineStore", "name": "Shop", "legal_name": "Shop Ltd", "vat_id": "BG206123456", "tax_id": "206123456",
+  "email": "office@shop.bg", "phone": "+359888111222", "street": "5 Test str.", "city": "Sofia", "postal_code": "",
+  "country": "BG", "contact_url": "/bg/contacts", "same_as": ["https://www.facebook.com/shop"], "founder": "",
+  "founding_date": "2023", "description": "…", "alternate_names": ["ShopCo"], "extra": { "slogan": "…" } }
+```
+- Frontend guide (graph, nodes, cache): `core-organization-frontend-spec.md`
+
 ### GET /?route=returnable_orders
 - Full returns guide (flow, rules, form checklist): `core-v4-returns.md`
 - Auth: Bearer (logged user)
