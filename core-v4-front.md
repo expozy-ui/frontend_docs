@@ -689,7 +689,6 @@ Params:
   - `ai_cache_ttl_product`: int, seconds 0-3600 (0 = no cache): AI HTML cache for product and category pages
   - `ai_cache_ttl_default`: int, seconds 0-3600: AI HTML cache for all other pages
   - `ai_version_bots`: string[]: User-Agent substrings of AI bots (from `AiVersion::BOTS` in the code, not editable). Never contains Google/Bing/Apple crawlers or strings under 4 chars.
-- Admin (for the admin panel, Bearer + admin): `GET /api/admin/ai_version` returns the three values + `ai_version_bots` + `protected_bots`; `POST /api/admin/ai_version` saves `ai_version_enabled` (0|1, missing = 0) and the two TTLs (whole numbers 0-3600, otherwise `{ status: 0, errors: { '[name="..."]': ... } }`).
 
 ### GET /?route=settings_web
 - Auth: none
