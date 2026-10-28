@@ -1522,3 +1522,124 @@ ExpozyAIPreview (config.preview_ua) показва AI версията и при
 ":href", class=; няма PHP грешки (търси „Fatal error“ — статусът може да е 200);
 данните съвпадат с Alpine страницата. И че нормалната версия (без -A) не е
 променена.
+
+═══════════════════════════════════════════════════════════
+25. JSON-LD (СТРУКТУРИРАНИ ДАННИ) — ЕДИН @graph, ЕДИН ИЗТОЧНИК
+═══════════════════════════════════════════════════════════
+
+Всяка страница със статус 200 извежда един `<script type="application/ld+json">`
+с `@graph`, сглобен от `core/classes/class.json_ld.php` (`JsonLd`). Входната точка е
+`GeoOptimizer::headTags()` — викат го `pages/header.php` и `ai_version/layout.php`,
+съдържанието е **еднакво** за хора и за AI ботове. На 404/503 — нищо.
+`GeoOptimizer` остава за продуктите (FAQ, гео мета тагове, LLMO блок).
+Не пиши JSON-LD на ръка в `.html` на страница, в `static/pages/*`, в шаблон на
+`ai_version/`, в `scripts.header` или в `$this->script` на `Page::load_page()`.
+Вече написан на ръка JSON-LD се маха, когато `JsonLd` дойде в проекта.
+
+Проект без `class.json_ld.php` не извежда графа, докато класът не бъде пренесен
+(първо ecommerce, после проект по проект).
+
+── ОТКЪДЕ ИДВАТ ДАННИТЕ ──
+
+  Organization / WebSite / WebPage   → `JsonLd::organization()` от `GET /api/organization`
+                                        (кеширан във фронтенда по език, ~1 час;
+                                        грешка — маркер за 5 мин.)
+                                        (администраторът: devcore → Settings →
+                                        „Организация“, „Данни за фактура“, „Контакти“,
+                                        „Социални мрежи“). Фронтендът НЕ ги знае и
+                                        НЕ ги измисля. Празно поле не се извежда.
+  Product / Article / Collection…    → обектът, който `Page::load_page()` вече е
+                                        заредил (`$page->get_target()`), без втора
+                                        заявка.
+  Лого, URL, езици                   → `$core->web['logo']`, `SITEURL`, `languages()`.
+
+── @id КОНВЕНЦИЯ ──
+
+  {SITEURL}/#organization   {SITEURL}/#website   {SITEURL}/#logo
+  {canonical}#webpage       {canonical}#breadcrumb
+  {url}#product             {url}#article        {url}#<тип>  за нови обекти
+
+  Страничните възли сочат към организацията с {"@id": ".../#organization"}
+  (publisher, seller, provider, about) вместо да повтарят името ѝ.
+
+── ПРАВИЛА ──
+
+- Пропусни, не измисляй: няма fallback към измислени стойности; адресът и
+  точката за контакт се извеждат само в цялост.
+- Canonical — само от `Page::canonical()` (път + параметрите, които сменят
+  съдържанието, + ?page=N), един и същ в нормалната и в AI версията и в
+  `WebPage.url`. Нов параметър със собствено съдържание (?id=, ?vehicle=) →
+  в константата на `Page`, не само в `ai_version/config.php`.
+- `WebPage` е на всяка страница със статус 200, и на служебните.
+- Product — без `category`: Google (Merchant listings) я приема само от своя
+  каталог с продукти, не името от магазина; категорията е в `BreadcrumbList`.
+  `image` е задължително за Merchant listings — идва от снимките на продукта.
+- `organization.extra` се слива в Organization след типизираните полета.
+- Ръчният „Schema organization“ скрипт от админа се извежда след графа както е.
+- JSON-LD се генерира само на сървъра; SPA навигацията не го обновява и това е
+  нарочно.
+
+── НОВ ТИП СТРАНИЦА (хотел, обява, аукцион, дилър…) ──
+
+JSON-LD е ЧЕТВЪРТОТО огледало на динамичната страница, до трите от раздели
+23 и 24 (page.js ↔ class.page.php ↔ ai_version шаблон). При нов slug с ID в URL-а:
+
+  1) Избери schema.org тип за обекта и за страницата:
+       хотел → LodgingBusiness / Hotel + WebPage
+       обява за кола → Car (Vehicle) с offers → Offer + WebPage
+       аукцион → Product с offers → Offer (price = текуща/начална цена,
+                 availability, validThrough = край на търга) + WebPage
+       дилър/партньор → Organization (отделен @id {url}#dealer, НЕ #organization)
+       обява за имот → RealEstateListing с offers → Offer (наем: цена на месец)
+       жилищен комплекс → ApartmentComplex / Residence
+       събитие → Event
+       услуга → Service с provider → #organization
+     При съмнение — проверка в https://schema.org/docs/full.html и Google
+     Search Central → Structured data → поддържаните типове.
+  2) В `JsonLd` — нов клон по `$page->slug`, който взима обекта с
+     `$page->get_target('<endpoint>', $id)` (id от пътя или от ?id=) и връща възел
+     с `@id` = `{url}#<тип>`; `WebPage.mainEntity` сочи към него; `BreadcrumbList`
+     ако страницата има родител. Без нова заявка за обекта.
+  3) Полетата: само това, което потребителят вижда на страницата (парност с
+     Alpine и с AI шаблона). Цени → `Offer` с `priceCurrency` от `$currency`.
+  4) Списъчна страница на типа (всички хотели) → `CollectionPage`. `ItemList` само
+     ако списъкът вече е зареден на сървъра или endpoint-ът е в `Cache::ENDPOINTS` —
+     не добавяй некеширана заявка на всяко отваряне на страницата.
+  5) Тест — задължителен, по „ТЕСТ“ по-долу.
+
+── ТЕСТ (ЗАДЪЛЖИТЕЛЕН СЛЕД ВСЯКА ПРОМЯНА В JSON-LD) ──
+
+След генериране на JSON-LD за нова страница (или промяна в `JsonLd` /
+`GeoOptimizer`) — всяка засегната страница през трите проверки:
+
+  1) curl като човек и като бот (`-A "ExpozyAIPreview"`) → точно един
+     `application/ld+json` и еднакъв граф в двете версии (`diff`); на 404 — нито един.
+
+  2) Schema.org Validator — синтаксис и речник на schema.org:
+       https://validator.schema.org/#url=<URL-encoded адрес на страницата>
+     Резултат: 0 ГРЕШКИ и 0 ПРЕДУПРЕЖДЕНИЯ. Възлите, вързани с @id, се показват
+     вложени (Product в WebPage.mainEntity, Organization в seller/author) — това е
+     правилно, не липса.
+     Смяна само на #url= в същия раздел НЕ пуска нов тест — зареди друга страница
+     между два теста или ползвай „Стартиране на нов тест“.
+
+  3) Google Rich Results Test — дали Google може да покаже обогатен резултат:
+       https://search.google.com/test/rich-results?url=<URL-encoded адрес>
+     Тестът отнема около минута. Резултат: всеки открит тип (Product snippets,
+     Merchant listings, Articles, Breadcrumbs…) без „critical issue“. Забележки
+     „(optional)“ са допустими, ако данните ги няма в API-то (напр. shippingDetails,
+     hasMerchantReturnPolicy за магазин) — запиши ги в отчета.
+     Критична грешка заради липсващи данни в теста (напр. продукт без снимка →
+     Missing field "image") не е грешка в кода — повтори теста на обект с пълни
+     данни. НЕ попълвай липсващо поле с измислена стойност (лого вместо снимка и т.н.).
+
+  Тествай обект с реални, пълни данни (снимка, цена, наличност, дата), не празен
+  тестов запис. Страницата трябва да е публично достъпна (без парола / Basic Auth) —
+  иначе и двата валидатора получават 401.
+
+── ЗАДЪЛЖИТЕЛЕН РЕД В КРАЯ НА ЗАДАЧА С НОВ ТИП СТРАНИЦА ──
+
+  JSON-LD: {тип на възела и @id} — validator.schema.org: {грешки/предупреждения},
+           Rich Results: {типове и статус}
+  или
+  JSON-LD: не е засегнат — {защо}

@@ -502,7 +502,7 @@ When a route accepts `query_id` for single-record reads, it is written as `id=<i
   "country": "BG", "contact_url": "/bg/contacts", "same_as": ["https://www.facebook.com/shop"], "founder": "",
   "founding_date": "2023", "description": "…", "alternate_names": ["ShopCo"], "extra": { "slogan": "…" } }
 ```
-- Frontend guide (graph, nodes, cache): `core-organization-frontend-spec.md`
+- Frontend: `JsonLd` (`core/classes/class.json_ld.php`); rules — section 25 of `frontend_framework.md`
 
 ### GET /?route=returnable_orders
 - Full returns guide (flow, rules, form checklist): `core-v4-returns.md`
