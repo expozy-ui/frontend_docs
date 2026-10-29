@@ -476,7 +476,7 @@ When a route accepts `query_id` for single-record reads, it is written as `id=<i
 
 | Key | Type | Source / notes |
 |---|---|---|
-| `type` | string | `Organization` \| `OnlineStore` \| `LocalBusiness` (admin choice) |
+| `type` | string | `Organization` \| `OnlineStore` \| `LocalBusiness` \| `SportsTeam` (admin choice) |
 | `name` | string | site name |
 | `legal_name` | string | legal company name (invoice data) |
 | `vat_id` | string | VAT number, uppercase |
