@@ -225,6 +225,8 @@ GET /sportiva_teams/<id>             → профилът на отбора — 
   "city": "София",
   "country": "България",
   "stadium": "Георги Аспарухов",
+  "stadium_lat": 42.705467,
+  "stadium_lng": 23.363197,
   "capacity": 17688,
   "founded": "24 май 1914 г.",
   "kit_colors": "синьо и бяло",
@@ -232,6 +234,9 @@ GET /sportiva_teams/<id>             → профилът на отбора — 
   "coach": "Хулио Веласкес",
   "captain": "Кристиан Димитров",
   "star_player": "Светослав Вуцов",
+  "website": "https://levski.bg/",
+  "facebook": "https://www.facebook.com/levskiofficial",
+  "instagram": "",
   "titles": 27,
   "cups": 26,
   "wikidata_id": "Q193209",
@@ -254,6 +259,8 @@ GET /sportiva_teams/<id>             → профилът на отбора — 
 | `city`, `country` | string | може да са празни |
 | `stadium`, `founded`, `kit_colors`, `nickname`, `coach`, `captain`, `star_player` | string | профилът; **всяко може да е празно** — не показвай реда тогава |
 | `capacity` | int | места на стадиона; `0` = няма данни |
+| `stadium_lat` / `stadium_lng` | float | стадионът на картата — географска ширина и дължина. `0` и `0` = няма координати, не показвай карта |
+| `website`, `facebook`, `instagram` | string | пълни адреси (`https://…`) — официалният сайт и профилите на клуба; **всяко може да е празно** |
 | `founded` | string | както е въведено — година или пълна дата („1914", „24 май 1914 г.") |
 | `titles` / `cups` | int | шампион на България / носител на Купата — брой пъти; `0` = няма или няма данни |
 | `description` | string | кратка история, обикновен текст; може да е празен |
@@ -682,6 +689,7 @@ GET /sportiva_matches_ticker?league_id=1  → само от първенство
 | 2026-10-29 | Нови: `GET /sportiva_matches` (т. 10), `GET /sportiva_standings` (т. 11), `GET /sportiva_rounds` (т. 12), `GET /sportiva_matches_ticker` (т. 15); `GET /sportiva_leagues?with_top=1` (т. 3) |
 | 2026-10-29 | **Промяна в поведението:** `GET /sportiva_leagues/<id>` връща цялата страница на първенството (т. 13), `GET /sportiva_teams/<id>` — профила на отбора (т. 14). Полетата на самия обект са същите, добавени са нови |
 | 2026-10-29 | Отборът има ново служебно поле `external_squad` (т. 4) |
+| 2026-10-29 | Отборът: нови полета `website`, `facebook`, `instagram`, `stadium_lat`, `stadium_lng` (т. 4). Всички отбори имат лого, а баджът (`color` / `text_color`) е в цветовете на логото |
 | 2026-10-29 | `GET /blogPosts`: нови параметри `include_children`, `order_by=views&period=`, `has_video`; ново поле `video_thumbnail`; `read_time` и `description_short` вече са верни за кирилица (т. 6) |
 | 2026-10-29 | Нов `GET /sportiva_blog_home` — блоковете на началната страница с една заявка (т. 7) |
 | 2026-10-29 | `GET /gallery_categories`: нови полета `description`, `slug`, `date_publish`, `category_id`, `views`, `url`, `photos_count`, `cover`; списъкът вече е **без** `gallery` (само корица и брой); по `id` брои преглед (т. 8) |
