@@ -477,7 +477,7 @@ When a route accepts `query_id` for single-record reads, it is written as `id=<i
 | Key | Type | Source / notes |
 |---|---|---|
 | `type` | string | `Organization` \| `OnlineStore` \| `LocalBusiness` \| `SportsTeam` (admin choice) |
-| `name` | string | site name |
+| `name` | string | brand name (admin → Organization); empty → site name (`site_name`, tied to the SaaS) |
 | `legal_name` | string | legal company name (invoice data) |
 | `vat_id` | string | VAT number, uppercase |
 | `tax_id` | string | EIK |
@@ -720,6 +720,7 @@ Params:
 ### GET /?route=settings
 - Auth: none
 - Returns: sanitized `core` settings object (SMTP fields removed)
+- `brand_name`: string, customer-facing name (admin → Organization), `''` when not set. Show `brand_name || site_name` to customers; `site_name` is the SaaS project name and cannot be changed.
 - AI visibility (frontend module `ai_version`) fields, always present:
   - `ai_version_enabled`: int 0|1 (module on/off)
   - `ai_cache_ttl_product`: int, seconds 0-3600 (0 = no cache): AI HTML cache for product and category pages
