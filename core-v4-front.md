@@ -278,8 +278,10 @@ When a route accepts `query_id` for single-record reads, it is written as `id=<i
 
 ### GET /?route=econt
 - Auth: none
-- Params: optional `offices=1`
-- Returns: Econt offices or cities — vendor-specific arrays (see `lib/classes/econt/`)
+- Params: optional `offices=1`; with it optional `is_automat=1|0` (only lockers / only offices)
+- Returns: without `offices` — Econt cities (vendor array). With `offices=1` — flat list sorted by address:
+  `{ id: int, name: string, address: string, officeCode: string, countryCode: string (ISO3), city_name: string, city_postcode: string, is_automat: int 0|1 }`
+  `is_automat: 1` = Econtomat (parcel locker, Econt `isAPS`), `0` = office. Show it to the customer (icon / "only lockers" filter).
 
 ### GET /?route=epay
 - Auth: none
@@ -743,7 +745,10 @@ Params:
 
 ### GET /?route=speedy
 - Auth: none
-- Returns: flat list of Speedy offices
+- Params: optional `search` (address substring, Latin is converted to Cyrillic), optional `is_automat=1|0` (only lockers / only offices)
+- Returns: flat list of Speedy offices sorted by address:
+  `{ id: int, name: string, address: string, officeCode: string, siteId: int, countryCode: string (ISO3), city_name: string, city_postcode: string, is_automat: int 0|1 }`
+  `is_automat: 1` = parcel locker (Speedy office `type = APT`), `0` = office.
 
 ### GET /?route=surveys
 - Auth: none
