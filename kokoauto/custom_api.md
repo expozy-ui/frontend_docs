@@ -366,6 +366,7 @@ OE номерата на автопроизводителите (BMW, FORD, ...)
 | `category_id` | int | — | Само за `products` — стеснява до категория. |
 | `min_price`, `max_price` | number | — | Само за `products`. |
 | `order_by`, `sortdirection` | `price`\|`title`, `asc`\|`desc` | — | Само за `products` — като в [`kokoauto_products`](#214-get-kokoauto_products--листинг-за-кола--категория): наличните първи и подредени, без наличност накрая. |
+| `brands` | CSV int | — | Само за `products` — само тези брандове (`brandNo`), напр. `4426,3`. `brandNo` на група (VAG от `products.brands`) връща всички нейни марки. `pagination` е след филтъра. |
 
 **Връща** обект с група за всеки домейн:
 ```ts
@@ -378,7 +379,7 @@ OE номерата на автопроизводителите (BMW, FORD, ...)
   categories: KokoAutoCarsCategories[],  // само листови категории
   products: {
     pagination: Pagination,
-    brands:     BrandFacet[],
+    brands:     BrandFacet[],             // от ВСИЧКИ намерени (не само страницата), без да гледа ?brands — за избор
     categories: KokoAutoCarsCategories[], // категориите, в които има намерени продукти
     filters:    { criteria: CriteriaFilter[], price: { min, max } },
     result:     Product[]
@@ -455,6 +456,22 @@ OE номерата на автопроизводителите (BMW, FORD, ...)
 Връща само одобрените (`status_id = 1`) коментари с `type = "global"`.
 
 **Връща:** плосък масив [`Comment[]`](#comment).
+
+### 2.24a. `POST /product_comments` — нов отзив
+
+| Param | Тип | Задълж. | Описание |
+|-------|-----|---------|----------|
+| `comment` | string | да | Текстът. Празен → `status: 0`, грешка на `[name="comment"]`. |
+| `rating` | int | — | Оценка. |
+| `product_id` или `subject_id` | int | — | Продуктът (`product_id` има предимство). |
+| `type` | string | — | По подразбиране `"global"` — само те излизат в `GET /product_comments`. |
+| `user_name`, `email` | string | — | Авторът (имейлът не се връща публично). |
+| `parent_id` | int | — | Отговор на друг отзив. |
+| `images[]` | file | — | Снимки (multipart). |
+
+Без токен (и гост може); с токен се записва и `user_id`. Отзивът **винаги е нов и чака одобрение** (`status_id: 0`) — `id` и `status_id` от фронта се игнорират. Излиза в `GET /product_comments` чак след одобрение в админа.
+
+**Връща:** `{ status: 1, msg, obj: Comment }`.
 
 ### 2.25. Поръчки — `brand` на продуктите (не е част от KokoAuto)
 
