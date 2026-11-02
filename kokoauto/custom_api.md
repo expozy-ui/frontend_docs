@@ -456,6 +456,26 @@ OE номерата на автопроизводителите (BMW, FORD, ...)
 
 **Връща:** плосък масив [`Comment[]`](#comment).
 
+### 2.25. Поръчки — `brand` на продуктите (не е част от KokoAuto)
+
+Ядрените endpoint-и, които връщат поръчка с продуктите ѝ (`GET /orders`, `GET /orders/<id>` 🔒, `GET /returnable_orders` 🔒, `GET /guest_returnable_order`), са описани в ядрената документация. **Особеност в KokoAuto:** всеки елемент на `products[]` носи `brand` — ядрото го маха, тук го има.
+
+```ts
+products[]: {
+  ...,
+  brand_id: int,      // = brandNo
+  brand:    Brands,   // { id, title, images[], ... }
+}
+```
+
+`brand` е по групата, както навсякъде на фронта (виж [`Product.brand`](#product)): оригинал на VW идва с `title: "VAG"` и логото на групата, `id` остава на марката (9000030). Марка без група (FORD, MAXUS) и aftermarket (HENGST FILTER) — както си е. Продукт без бранд → `brand.id = 0`.
+
+```json
+"products": [
+  { "id": 1085620, "title": "Маслен филтър", "brand_id": 81, "brand": { "id": 81, "title": "HENGST FILTER", "images": [ … ] }, "quantity": 1, "total": "6.80", … }
+]
+```
+
 ---
 
 ## 3. Schemas
@@ -779,7 +799,7 @@ OE номерата на автопроизводителите (BMW, FORD, ...)
   brand:         Brands,    // { id, title, images[], website, company, available_parts_count, cars_count, categories_count, ... }
                             // Оригинал на марка от група (VW, AUDI, SEAT, … → VAG): title = името на групата ("VAG"),
                             // images = логото ѝ; id остава на марката (9000030 = VW) → линкът към страницата на марката води към VW.
-                            // Навсякъде на фронта (категории, търсене, детайл, кросове, любими); админът вижда истинската марка.
+                            // Навсякъде на фронта (категории, търсене, детайл, кросове, любими, поръчки); админът вижда истинската марка.
   is_oe:         bool,      // оригинална част на автопроизводителя
   oe_numbers:    OeNumber[],// само в kokoauto_aftermarket_products при оригиналите (слети по групи марки, без product); иначе []
 
