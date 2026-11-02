@@ -335,3 +335,45 @@ Auth за всички: `saas_key` + `Authorization: Bearer <token>` на **ле
 ### Промени
 
 - **2026-10-12** — нови endpoint-и `GET` / `POST` / `DELETE /doctors_schedule_exceptions`. Не е breaking.
+
+---
+
+## 6. Бележки към час — видими само за лекаря (`private`)
+
+Лекарят избира дали бележката към час да се вижда от пациента (toggle). Бележка с `private: 1` вижда **само лекарят на часа**; за пациента тя не съществува — не идва в `notes[]` и не влиза в мейла за отказан час.
+
+Auth: `saas_key` + `Authorization: Bearer <token>` на **лекар**.
+
+### `POST /doctors_appointments_notes` — нова бележка
+### `POST /doctors_appointments_notes/<id>` — редакция
+
+| Param | Тип | Задълж. | Описание |
+|-------|-----|---------|----------|
+| `appointment_id` | int | да | Час на логнатия лекар. |
+| `note` | string | да | Текст. |
+| `private` | 0/1 | не | `1` = само за лекаря, `0` = вижда я и пациентът. Нова бележка без `private` → видима (`0`). При редакция липсващ = без промяна. |
+
+Отговор: както досега (`status`, `obj`, `appointments` на картона).
+
+Чужда бележка при редакция → `{ "status": 0, "error": "Note access error!" }` (преди лекар можеше да презапише чужда бележка по `id`).
+
+### `private` и при отказ / неявяване
+
+Лекарят може да прати `private` (0/1) и заедно с `note` при:
+- `DELETE /doctors_appointment/<id>` — отказ на час от лекаря;
+- `POST /doctors_appointment_noshow/<id>` — маркиране като неявил се.
+
+Без `private` → видима, както досега. Бележката на **пациента** при отказ е винаги видима (`private` се игнорира).
+
+### Обектът в `notes[]`
+
+Всяка бележка има ново поле `private` (bool):
+```json
+{ "id": 12, "appointment_id": 159, "doctor_id": 83, "client_id": 0, "note": "Да донесе изследванията", "private": false, "date_created": "2026-11-02 10:15:00" }
+```
+
+Къде се филтрира: `GET /doctors_appointments`, `GET /doctors_appointments/<id>`, `GET /my_doctors_appointments`, `GET /my_doctors_appointments_series` и `appointments` в отговора на POST бележка. Лекарят на часа получава всички бележки, всеки друг — без частните. Идеята за фронта: иконка/етикет „само за мен“ при `private: true`.
+
+### Промени
+
+- **2026-11-02** — ново поле `private` в бележките към час и параметър `private` в `POST /doctors_appointments_notes`, `DELETE /doctors_appointment`, `POST /doctors_appointment_noshow`. Не е breaking (без параметъра всичко е както досега).
