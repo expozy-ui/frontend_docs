@@ -495,6 +495,10 @@ POST/DELETE тялото е `application/x-www-form-urlencoded` или `multipar
 | `specs` | object / JSON string | `{ секция: { поле: стойност } }` (виж шаблона в т.2) |
 | `videos` | array / text | линкове към видео на **модела** (по един на ред) |
 | `images[]` / `image` | файл | снимки на **модела** (общи за всички вариации) |
+| `type` | string | тип на качените в заявката снимки: `exterior` (по подразбиране) / `interior` / `detail` |
+
+Снимките на модела (`model.images[]`, `specification.images[]`) имат поле `type` (`exterior` / `interior` / `detail`) —
+като снимките на обява. Импортът от autohome го попълва сам; старите снимки са `exterior`.
 
 Отговор: `{ status: 1, obj: CarsSpecification }` (с `videos` и `images`).
 Грешки: `_BC_ERR_SELLER_NOT_ACTIVE`, `_BC_ERR_SPECIFICATION_NOT_FOUND`, `_BC_ERR_SPECIFICATION_CREATE_FIELDS`, `_BC_ERR_VARIANT_NOT_FOUND`,
@@ -596,7 +600,8 @@ POST/DELETE тялото е `application/x-www-form-urlencoded` или `multipar
 |---|---|---|
 | `auction_id` | int, задълж. | |
 | `image_ids[]` | int[] | id-та от `model.images` |
-| `type` | string | `exterior` (по подразбиране) / `interior` / `detail` |
+| `type` | string | по избор: `exterior` / `interior` / `detail` — за всички подадени снимки. **Без него всяка снимка
+влиза с типа си от модела** (`model.images[].type`) — така може всички наведнъж |
 
 Отговор: `{ status: 1, objs: CarsAuctionImage[] }`. Грешки: `_BC_ERR_AUCTION_NO_ACCESS`, `_BC_ERR_PHOTO_NOT_FOUND` (нито една
 снимка не е копирана).
