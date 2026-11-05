@@ -525,11 +525,15 @@ POST/DELETE тялото е `application/x-www-form-urlencoded` или `multipar
 1. `POST /cars_model_import` с `name`.
 2. `result = candidates` → покажи списъка, търговецът избира → пак `POST /cars_model_import` със `series_id`.
 3. `result = existing` → моделът вече е в каталога, продължи с него (`model`, `variants`).
-4. `result = started` → импортът тече на заден план (1–3 мин.). Питай `GET /cars_model_import/<import.id>` на ~5 сек.,
-   показвай `progress_done / progress_total`, докато `status_id` стане `2` (готово) или `3` (грешка → покажи `error`).
-5. Готово → `model` + `variants` са в отговора; формата за обява продължава нормално (марка → модел → вариация →
-   техническите данни се попълват). Снимките на модела (`model.images`) търговецът може да вземе в обявата с
-   `POST /cars_auctions_images_from_model` или да качи свои.
+4. `result = started` → импортът тече на заден план. Питай `GET /cars_model_import/<import.id>` на ~3–5 сек.:
+   - след **~10–20 сек.** в отговора идват `model` и `variants` (още при `status_id = 1`) → търговецът вече може да
+     избере модел и вариация и да продължи с обявата (цена, пробег, снимки…);
+   - характеристиките на вариациите се дописват паралелно (`progress_done / progress_total`), обикновено до ~30 сек.;
+     при `status_id = 2` са готови — тогава формата може да попълни техническите данни от спецификацията;
+   - `status_id = 3` → грешка, покажи `error`.
+5. Снимките на модела (`model.images`, с `type`) се свалят в отделен процес и **може да продължат да идват и след
+   `status_id = 2`** (25 снимки ≈ 2–3 мин.) — презареди модела по-късно. Търговецът ги взима в обявата с
+   `POST /cars_auctions_images_from_model` или качва свои.
 
 **`POST /cars_model_import`**
 
