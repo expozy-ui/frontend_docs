@@ -504,9 +504,17 @@ POST/DELETE тялото е `application/x-www-form-urlencoded` или `multipar
 
 ### Нов модел от autohome.com.cn 🔒 (активен търговец)
 
-Когато моделът го няма в каталога, търговецът пише името му **на китайски** (както е в autohome.com.cn, напр. `元UP`,
-`海狮07 EV`, `比亚迪 夏`). Бекендът намира модела в autohome, AI превежда всички версии в продажба в нашия формат и
-създава модела, вариациите със спецификациите и снимките на модела. Новият модел е в каталога веднага.
+Когато моделът (или версията) го няма в каталога, търговецът пише името му **на китайски** (както е в autohome.com.cn,
+напр. `元UP`, `海狮07 EV`, `比亚迪 夏`) **или поставя линк** от autohome — към модел (`https://www.autohome.com.cn/7538/`)
+или към конкретна версия (`https://www.autohome.com.cn/spec/79231`). Бекендът намира модела в autohome, AI превежда
+версиите в нашия формат и създава модела (ако го няма), вариациите със спецификациите и снимките на модела. Всичко
+е в каталога веднага.
+
+- **Моделът го няма** → създава се с всички версии в продажба.
+- **Моделът го има** → добавят се само липсващите версии (вече внесените не се пипат; при модели отпреди импорта
+  година, която вече я има, не се внася отново — без дубли).
+- **Линк към версия** → внася се серията по горното правило + тази версия, дори да не е в продажба; в отговора
+  `variant_id` е нейната вариация, за да се избере директно във формата.
 
 Поток на фронта:
 
@@ -523,7 +531,7 @@ POST/DELETE тялото е `application/x-www-form-urlencoded` или `multipar
 
 | Параметър | Тип | Описание |
 |---|---|---|
-| `name` | string | името на модела на китайски (марката отпред не е задължителна) |
+| `name` | string | името на модела на китайски (марката отпред не е задължителна) **или** линк от autohome (модел / версия) |
 | `series_id` | int | вместо `name` — избраният кандидат от `candidates` |
 
 Отговори:
@@ -536,8 +544,11 @@ POST/DELETE тялото е `application/x-www-form-urlencoded` или `multipar
 ```
 
 ```json
-{ "status": 1, "result": "existing", "model": { "id": 6434, "title": "Yuan Plus", "manufacturer": {}, "images": [] }, "variants": [ { "id": 19001, "title": "2025 …", "year": 2025 } ] }
+{ "status": 1, "result": "existing", "model": { "id": 6434, "title": "Yuan Plus", "manufacturer": {}, "images": [] }, "variants": [ { "id": 19001, "title": "2025 …", "year": 2025 } ], "variant_id": 0 }
 ```
+
+`existing` = моделът е в каталога и няма какво да се добави. `variant_id` — вариацията на версията от линка (0, ако
+не е подаден линк към версия или тя не е при нас).
 
 ```json
 { "status": 1, "result": "started", "import": { "id": 12, "status_id": 0, "progress_total": 0, "progress_done": 0, "...": "..." } }
@@ -556,6 +567,8 @@ POST/DELETE тялото е `application/x-www-form-urlencoded` или `multipar
 | `progress_total`, `progress_done` | int | версии за внасяне / внесени |
 | `error` | string | текст на грешката при `status_id = 3` |
 | `model_id` | int | създаденият (или намереният) модел |
+| `spec_id` | int | версията от линка (0 без линк към версия) |
+| `variant_id` | int | при `status_id = 2` — вариацията на `spec_id` (0, ако няма) |
 | `model` | CarsModel \| null | при `status_id = 2` — с `manufacturer`, `images` |
 | `variants` | CarsModelVariant[] | при `status_id = 2` — `[{ id, model_id, title, year, status_id, sort, autohome_spec_id }]` |
 | `date_created`, `date_updated` | datetime | |
