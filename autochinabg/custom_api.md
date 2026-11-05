@@ -226,6 +226,35 @@ POST/DELETE тялото е `application/x-www-form-urlencoded` или `multipar
 
 Схема: [CarsAuctionFrontend](#154-обява).
 
+### `GET /cars_by_vin?vin=` 🔓
+
+Всичко, което имаме за колата по VIN: обявата + пълната спецификация на вариацията. Само от нашата база,
+без външно декодиране.
+
+| Параметър | Тип | Описание |
+|---|---|---|
+| `vin` | string, задълж. | VIN; интервалите се махат, главни/малки букви не са от значение |
+
+- Ако обявите с този VIN са няколко (клонирана, препусната), връща се **най-новата**.
+- Видимост като при `/cars_auctions?id=`: само публична и несвалена обява; собственикът и админът виждат и своите чернови/скрити.
+- VIN-ът в отговора остава маскиран (`auction.vin_masked`).
+
+Отговор:
+
+```json
+{
+  "status": 1,
+  "auction": { "id": 96, "title": "BYD Tang L EV 2025", "car_info": { "manufacturer": {}, "model": {}, "variant_id": 12, "year": 2025, "...": "..." }, "...": "..." },
+  "specification": { "id": 7, "variant_id": 12, "title": "...", "power_kw": 810, "battery_kwh": 100.5, "range_km": 600, "specs": "{\"Двигател\":{...}}", "images": [], "videos": [], "...": "..." }
+}
+```
+
+- `auction` — [CarsAuctionFrontend](#154-обява), същият обект като от `/cars_auctions?id=`.
+- `specification` — [CarsVariationSpecification](#151-каталог-автомобили) на `car_info.variant_id`; `null`, ако обявата няма вариация или вариацията няма спецификация.
+
+Грешки (HTTP 400): без `vin` → `errors: {"[name=\"vin\"]": "Моля, въведете"}`; няма видима обява с този VIN →
+`{ status: 0, error: "Обявата не е намерена." }`.
+
 ### `GET /cars_auctions_statuses` 🔓
 
 `[{ id, title, color }]`. Статуси на обява:
