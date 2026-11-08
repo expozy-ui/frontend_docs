@@ -476,6 +476,159 @@ POST/DELETE тялото е `application/x-www-form-urlencoded` или `multipar
 
 **`DELETE /cars_model_images/<id>`** — трие снимка на модел. Грешки: `_BC_ERR_SELLER_NOT_ACTIVE`, `_BC_ERR_PHOTO_NOT_FOUND`.
 
+Снимките на модела (`model.images[]`) имат поле `type` (`exterior` / `interior` / `detail`) — внесените от autohome
+са с типа си, останалите са `exterior`.
+
+### Нов модел от autohome.com.cn 🔒 (активен търговец)
+
+Когато моделът (или версията) го няма в каталога, търговецът пише името му **на китайски** (както е в autohome.com.cn,
+напр. `元UP`, `海狮07 EV`, `比亚迪 夏`) **или поставя линк** от autohome — към модел (`https://www.autohome.com.cn/7538/`)
+или към конкретна версия (`https://www.autohome.com.cn/spec/79231`). Бекендът намира модела в autohome, AI превежда
+версиите в нашия формат и създава модела (ако го няма), вариациите със спецификациите и снимките на модела. Всичко
+е в каталога веднага.
+
+**Характеристиките (`specs`) са на английски**, със същите секции и полета като останалите коли в каталога
+(`Basic information`, `Car body`, `Battery & Charging`…). Заглавието на спецификацията е пълното име
+(`BYD Yuan UP 2027 Feichi 401KM Vitality Edition`). Оригиналните китайски параметри от autohome са в `specs_cn`.
+
+- **Моделът го няма** → създава се с всички версии в продажба.
+- **Моделът го има** → добавят се само липсващите версии (вече внесените не се пипат; при модели отпреди импорта
+  година, която вече я има, не се внася отново — без дубли).
+- **Линк към версия** → внася се серията по горното правило + тази версия, дори да не е в продажба; в отговора
+  `variant_id` е нейната вариация, за да се избере директно във формата.
+
+Поток на фронта:
+
+1. `POST /cars_model_import` с `name`.
+2. `result = candidates` → покажи списъка, търговецът избира → пак `POST /cars_model_import` със `series_id`.
+3. `result = existing` → моделът вече е в каталога, продължи с него (`model`, `variants`).
+4. `result = started` → импортът тече на заден план. Питай `GET /cars_model_import/<import.id>` на ~3–5 сек.:
+   - след **~10–20 сек.** в отговора идват `model` и `variants` (още при `status_id = 1`) → търговецът вече може да
+     избере модел и вариация и да продължи с обявата (цена, пробег, снимки…);
+   - характеристиките на вариациите се дописват паралелно (`progress_done / progress_total`), обикновено до ~30 сек.;
+     при `status_id = 2` са готови — тогава формата може да попълни техническите данни от спецификацията;
+   - `status_id = 3` → грешка, покажи `error`.
+5. Снимките на модела (`model.images`, с `type`) се свалят в отделен процес и **може да продължат да идват и след
+   `status_id = 2`** (до 50 снимки — 30 екстериор + 20 интериор, ≈ 4–5 мин.) — презареди модела по-късно. Търговецът ги взима в обявата с
+   `POST /cars_auctions_images_from_model` или качва свои.
+
+**`POST /cars_model_import`**
+
+| Параметър | Тип | Описание |
+|---|---|---|
+| `name` | string | името на модела на китайски (марката отпред не е задължителна) **или** линк от autohome (модел / версия) |
+| `series_id` | int | вместо `name` — избраният кандидат от `candidates` |
+
+Отговори:
+
+```json
+{ "status": 1, "result": "candidates", "candidates": [
+  { "brand_id": 15, "brand": "比亚迪", "series_id": 7977, "series": "海狮07 DM-i", "discontinued": false },
+  { "brand_id": 15, "brand": "比亚迪", "series_id": 6851, "series": "海狮07 EV", "discontinued": true }
+] }
+```
+
+```json
+{ "status": 1, "result": "existing", "model": { "id": 6434, "title": "Yuan Plus", "manufacturer": {}, "images": [] }, "variants": [ { "id": 19001, "title": "2025 …", "year": 2025 } ], "variant_id": 0 }
+```
+
+`existing` = моделът е в каталога и няма какво да се добави. `variant_id` — вариацията на версията от линка (0, ако
+не е подаден линк към версия или тя не е при нас). `photos_pending: true` — моделът имаше под 10 снимки и в момента
+се допълват от autohome на заден план (до 30 екстериор + 20 интериор) — презареди `model.images` след 4–5 мин.
+
+Същото важи и при `started`: модел с под 10 снимки се допълва; вече свалените не се дублират.
+
+```json
+{ "status": 1, "result": "started", "import": { "id": 12, "status_id": 0, "progress_total": 0, "progress_done": 0, "...": "..." } }
+```
+
+Ако същият модел вече се внася (от друг търговец), връща се същият импорт.
+
+**`GET /cars_model_import/<id>`** — статусът; вижда го само търговецът, който го е пуснал.
+
+| Поле | Тип | Описание |
+|---|---|---|
+| `id` | int | |
+| `query` | string | написаното от търговеца |
+| `series_id`, `series_title`, `brand_title` | | серията в autohome (китайските имена) |
+| `status_id` | int | `0` чака, `1` тече, `2` готово, `3` грешка |
+| `progress_total`, `progress_done` | int | версии за внасяне / внесени |
+| `error` | string | текст на грешката при `status_id = 3` |
+| `model_id` | int | създаденият (или намереният) модел |
+| `mode` | string | `""` — пълен импорт; `"photos"` — само снимки (`POST /cars_model_photos_import`) |
+| `spec_id` | int | версията от линка (0 без линк към версия) |
+| `variant_id` | int | при `status_id = 2` — вариацията на `spec_id` (0, ако няма) |
+| `model` | CarsModel \| null | при `status_id = 2` — с `manufacturer`, `images` |
+| `variants` | CarsModelVariant[] | при `status_id = 2` — `[{ id, model_id, title, year, status_id, sort, autohome_spec_id }]` |
+| `date_created`, `date_updated` | datetime | |
+
+Спецификацията на всяка вариация: `GET /cars_model_specifications?variant_id=`.
+
+Грешки (HTTP 400 `{ status: 0, error }`):
+
+| Кога | Текст |
+|---|---|
+| търговецът не е активен | `_BC_ERR_SELLER_NOT_ACTIVE` |
+| без `name` и `series_id` | `[name="name"]`: "Enter the model name (in Chinese)." |
+| моделът го няма в autohome | "The model was not found on autohome.com.cn — check the name…" |
+| autohome не отговаря | "No connection to autohome.com.cn — try again later or enter the data manually." |
+| autohome са сменили формата | "autohome.com.cn has changed its data format — the import is temporarily unavailable, enter the data manually." |
+| няма версии в продажба | "autohome.com.cn has no trims on sale for this model." |
+| AI не успя / няма AI ключ | "The AI translation of the specifications failed — please try again." / "No AI key (TeamoRouter) is set…" |
+| процесът спря (>15 мин. без промяна) | "The import stopped responding — please start it again." |
+| `GET` на чужд/несъществуващ импорт | "The import was not found." |
+
+**`POST /cars_model_photos_import`** 🔒 (активен търговец) — **само снимките** от autohome към избран модел, без
+характеристики и без AI. За бутона „Снимки от autohome": търговецът е избрал модела във формата и поставя линк.
+
+| Параметър | Тип | Описание |
+|---|---|---|
+| `model_id` | int, задълж. | моделът при нас, към който отиват снимките |
+| `link` | string, задълж. | линк от autohome — към версия (`https://www.autohome.com.cn/spec/79231`) или към модел (`https://www.autohome.com.cn/7538/`) |
+
+- Снимките се взимат от **галерията на версията**. При линк към модел — от най-новата версия в продажба.
+- До **50 снимки**: 30 екстериор + 20 интериор (`model.images[].type` = `exterior` / `interior`).
+- Снимки, които моделът вече има, не се свалят втори път. Ограничението от 10 снимки при пълния импорт тук не важи —
+  сваля се дори моделът да има много снимки.
+- Ако моделът още не е вързан с autohome, връзва се с модела от линка.
+
+Отговор — както `started` при пълния импорт:
+
+```json
+{ "status": 1, "result": "started", "import": { "id": 31, "mode": "photos", "status_id": 0, "model_id": 6434, "progress_total": 0, "progress_done": 0, "...": "..." } }
+```
+
+Следи се със същия `GET /cars_model_import/<import.id>` на ~3–5 сек. Тук `progress_total` е броят **нови** снимки
+за сваляне, `progress_done` — свалените до момента (≈ 5 сек. на снимка, 50 снимки ≈ 3–4 мин.). При `status_id = 2`
+снимките са в `model.images`. `progress_total = 0` при `status_id = 2` значи, че моделът вече ги има всичките.
+Свалените снимки се виждат в `model.images` още докато импортът тече.
+
+Грешки:
+
+| Кога | Текст |
+|---|---|
+| търговецът не е активен | `_BC_ERR_SELLER_NOT_ACTIVE` |
+| липсва / грешен `model_id` | `[name="model_id"]`: "Select a model." |
+| липсва `link` или не е линк към autohome | `[name="link"]`: "Enter a link to the model or trim on autohome.com.cn." |
+| моделът е вързан с друг модел в autohome | "The link points to a different model on autohome.com.cn, not the selected one." |
+| моделът от линка го няма в autohome | "The model was not found on autohome.com.cn — check the name…" |
+| autohome не отговаря / сменен формат | същите текстове като при пълния импорт |
+| в галерията няма снимки (`status_id = 3`) | "autohome.com.cn has no photos for this trim." |
+| друга грешка при свалянето (`status_id = 3`) | "The photos could not be downloaded — please try again." |
+
+**`POST /cars_auctions_images_from_model`** 🔒 (само продавачът на обявата) — копира снимки на модела в обявата
+(като нови снимки на обявата — после се подреждат/трият като останалите). Слагат се след вече качените.
+
+| Параметър | Тип | Описание |
+|---|---|---|
+| `auction_id` | int, задълж. | |
+| `image_ids[]` | int[] | id-та от `model.images` |
+| `type` | string | по избор: `exterior` / `interior` / `detail` — за всички подадени снимки. **Без него всяка снимка
+влиза с типа си от модела** (`model.images[].type`) — така може всички наведнъж |
+
+Отговор: `{ status: 1, objs: CarsAuctionImage[] }`. Грешки: `_BC_ERR_AUCTION_NO_ACCESS`, `_BC_ERR_PHOTO_NOT_FOUND` (нито една
+снимка не е копирана).
+
 ---
 
 ## 8. Заявки — резервация, покупка, лизинг
