@@ -132,4 +132,81 @@ function sendAnalyticsIdentity(categories) {
 
 | Кога | Отговор |
 |---|---|
-| няма вход / невалиден токен | HTTP 400, `status: 0` |
+| няма вход / невалиден токен | HTTP 400, `{ "status": 0, "errors": ["Login first v4!"] }` |
+
+### 2.2. Задача за фронта — как да се вържe
+
+Целта: при всеки известен избор в банера, ако потребителят е влязъл, да се
+извика `POST /analytics_identity`. Нищо друго — евентите `auction_deposit`,
+`kyc_completed` и `auction_won` **не се добавят** в `analytics.js` и не се пращат
+през `track()`.
+
+**1. Една функция в `pages/header.php`**, до `window.applyConsent` (в блока
+„Google Consent Mode v2“):
+
+```js
+window.sendAnalyticsIdentity = function (categories) {
+	// LOGGED_IN / COREURL се дефинират в по-късен <script> блок — при
+	// синхронното извикване по-горе в header.php още ги няма.
+	if (typeof LOGGED_IN === 'undefined' || LOGGED_IN != 1) return;
+	categories = categories || [];
+
+	function cookie(name) {
+		var m = document.cookie.match(new RegExp('(?:^|;\\s*)' + name + '=([^;]*)'));
+		if (!m) return '';
+		try { return decodeURIComponent(m[1]); } catch (e) { return m[1]; }
+	}
+
+	var payload = {
+		consent_analytics: categories.indexOf('analytics') > -1 ? 1 : 0,
+		consent_targeting: categories.indexOf('targeting') > -1 ? 1 : 0,
+		ga_client_id: cookie('_ga'),
+		fbp: cookie('_fbp'),
+		fbc: cookie('_fbc')
+	};
+
+	// Без повторно пращане в рамките на сесията, ако нищо не се е променило.
+	var key = JSON.stringify(payload);
+	try { if (sessionStorage.getItem('bc_ai') === key) return; } catch (e) {}
+
+	// POST към COREURL + 'analytics_identity' с payload-а — през същия механизъм
+	// за заявки, с който се пращат останалите 🔒 POST-ове (напр. web_notifications_read),
+	// за да тръгнат хедърите Authentication + Authorization. Fire-and-forget:
+	// грешка тук не бива да се показва на потребителя.
+	// При успех: try { sessionStorage.setItem('bc_ai', key); } catch (e) {}
+};
+```
+
+**2. Извикване от `window.applyConsent`** — то вече се вика и при първия избор,
+и при всяко зареждане със запазен избор (`onAccept`), и при промяна (`onChange`)
+в `coockieconsent_init.js`. Така едно място покрива всички случаи:
+
+```js
+window.applyConsent = function (categories) {
+	gtag('consent', 'update', window.consentState(categories));
+	if (window.sendAnalyticsIdentity) window.sendAnalyticsIdentity(categories);
+};
+```
+
+`applyConsent` се вика веднъж и синхронно в самия `header.php` (за връщащ се
+посетител, преди GTM). Тогава `_ga`/`_fbp` може още да не са поставени —
+това е нормално: празните стойности не трият записаните, а `onAccept` на
+`window.load` ще прати отново с бисквитките (ключът в `sessionStorage` е
+различен, защото стойностите са различни).
+
+**3. След успешен вход / регистрация** (имейл, Google, Facebook — в `user.js`,
+там, където сега се вика `analytics('login', …)` / `analytics('sign_up', …)`):
+ако страницата не се презарежда след входа, извикайте
+
+```js
+window.sendAnalyticsIdentity && window.sendAnalyticsIdentity(savedCategories());
+```
+
+където `savedCategories()` чете `cc_cookie` (както прави блокът в `header.php`)
+и връща `saved.categories` или `[]`. Ако след вход страницата се презарежда,
+стъпка 3 не е нужна — `onAccept` ще го направи.
+
+**Проверка:** влезте, приемете всички бисквитки → в DevTools → Network трябва
+да има една заявка `analytics_identity` с отговор `{"status":1}`. При откажи
+всички → заявка с `consent_analytics=0&consent_targeting=0`. Без вход —
+никаква заявка.
