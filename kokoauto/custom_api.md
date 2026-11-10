@@ -450,10 +450,13 @@ OE номерата на автопроизводителите (BMW, FORD, ...)
 
 | Param | Тип | Описание |
 |-------|-----|----------|
-| `product_id` | int | Отзивите за продукта. |
+| `product_id` | int | Отзивите за продукта (`type = "product"`). **Без него → отзивите за сайта** (`type = "global"`). |
 | `rating` | int | Само с тази оценка. |
+| `parent_id` | int | Само отговорите на този отзив. |
 
-Връща само одобрените (`status_id = 1`) коментари с `type = "global"`.
+Връща само одобрените (`status_id = 1`).
+
+> ⚠️ **Промяна (2026-11-10):** досега отзивите за продукт се записваха и връщаха като `type = "global"`. Вече са `type = "product"`; `global` е само за отзиви за сайта (без продукт).
 
 **Връща:** плосък масив [`Comment[]`](#comment).
 
@@ -462,9 +465,9 @@ OE номерата на автопроизводителите (BMW, FORD, ...)
 | Param | Тип | Задълж. | Описание |
 |-------|-----|---------|----------|
 | `comment` | string | да | Текстът. Празен → `status: 0`, грешка на `[name="comment"]`. |
+| `product_id` (или `subject_id`) | int | да, освен при `type = "global"` | Продуктът. Липсва → `status: 0`, грешка на `[name="product_id"]`. |
+| `type` | string | — | `"product"` по подразбиране. `"global"` = отзив за сайта, без продукт (`product_id` се игнорира). |
 | `rating` | int | — | Оценка. |
-| `product_id` или `subject_id` | int | — | Продуктът (`product_id` има предимство). |
-| `type` | string | — | По подразбиране `"global"` — само те излизат в `GET /product_comments`. |
 | `user_name`, `email` | string | — | Авторът (имейлът не се връща публично). |
 | `parent_id` | int | — | Отговор на друг отзив. |
 | `images[]` | file | — | Снимки (multipart). |
@@ -966,15 +969,15 @@ products[]: {
 ```ts
 {
   id:         int,
-  type:       string,       // "global"
-  subject_id: int,          // id на продукта
+  type:       string,       // "product" — отзив за продукт, "global" — отзив за сайта
+  subject_id: int,          // id на продукта (при "global" е 0)
   comment:    string,
   rating:     int,
   user_id:    int,
   user_name:  string,       // имейлът на автора НЕ се връща
   parent_id:  int,          // > 0 = отговор на друг коментар
   status_id:  int,          // 1 = одобрен
-  about:      [],           // за type "global" е празно — продуктът е в subject_id
+  about:      { id, url, title } | [],  // за "product" — продуктът; за "global" — []
   images:     object[],
   date, date_created, date_updated: datetime
 }
