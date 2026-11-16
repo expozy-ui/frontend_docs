@@ -266,3 +266,40 @@ window.sendAnalyticsIdentity && window.sendAnalyticsIdentity(savedCategories());
 |---|---|
 | няма вход | HTTP 400, `{ "status": 0, "errors": ["Login first v4!"] }` |
 | липсва `subscribed` | HTTP 400, `{ "status": 0, "errors": { "[name=\"subscribed\"]": "..." } }` |
+
+### 3.3. Задача за фронта — профил → „Нотификации“
+
+Сега в `static/pages/bg/userpage.html` има блок „Нотификации“ само за продавачи
+(`<template x-if="data.user.userlevel == 7">`), който праща `post.cars_seller`
+с `email_notification`. Той **се заменя** така:
+
+**1. Видим за всички профили** — купувачи и продавачи. Махнете условието
+`x-if="data.user.userlevel == 7"`.
+
+**2. Състоянието идва от `GET /marketing_emails`** (напр.
+`apiData="get.marketing_emails" keyName="marketingEmails"`), а превключвателят
+вика `POST /marketing_emails` с обратната стойност и обновява състоянието от
+отговора (`subscribed`):
+
+```html
+<button type="button" @click="alpineListeners('post.marketing_emails', $event)"
+  :data-subscribed="data.marketingEmails?.subscribed == 1 ? 0 : 1" keyName="marketingEmails"
+  :class="data.marketingEmails?.subscribed == 1 ? 'bg-[#5a9a7a]' : 'bg-[#181f2a]'">
+  …
+</button>
+```
+
+(Стиловете на превключвателя са същите като сега — сменят се само полето и endpoint-ът.)
+
+**3. Текстове** (дадени от клиента):
+
+- Заглавие на реда: **Имейл нотификации**
+- Текст под заглавието (маркетинг — с превключвател):
+  > Получавайте информация за нови автомобили на търг, интересни оферти, новини и промоции от Bids&Cars.
+- Втори ред под него, **без превключвател** (служебни — винаги включени, напр. с
+  иконка катинар или надпис „Винаги включени“):
+  > **Служебни известия** — наддавания, депозити, сделки и плащания. Изпращат се винаги, тъй като са част от услугата, и не могат да бъдат изключени.
+
+**4. Проверка:** влезте като купувач → блокът се вижда → изключете → в DevTools →
+Network `marketing_emails` връща `{"status":1,"subscribed":0}` и превключвателят
+остава изключен след презареждане. Същото като продавач.
