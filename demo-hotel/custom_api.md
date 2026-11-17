@@ -62,8 +62,8 @@ Authentication: Basic <saas_key>
 | `token` | string | Токен за вход в админа (64 знака, може да съдържа `@ # $ ! / \|`) |
 | `project_name` | string | `demo-hotel` — подава се при входа с токен |
 | `ip` | string | IP на клиента, както го вижда сървърът — подава се при входа с токен |
-| `admin_url` | string | Страницата за вход с имейл и парола: `https://admin.expozy.com/login/demo-hotel` |
-| `login_url` | string | Адресът за директен вход с токена: `https://admin.expozy.com/admin/login_token.php` |
+| `admin_url` | string | Страницата за вход с имейл и парола: `https://devadmin.expozy.com/login/demo-hotel` |
+| `login_url` | string | Адресът за директен вход с токена: `https://devadmin.expozy.com/admin/login_demo.php` |
 
 ```json
 {
@@ -72,8 +72,8 @@ Authentication: Basic <saas_key>
     "token": "<64 знака>",
     "project_name": "demo-hotel",
     "ip": "<IP>",
-    "admin_url": "https://admin.expozy.com/login/demo-hotel",
-    "login_url": "https://admin.expozy.com/admin/login_token.php"
+    "admin_url": "https://devadmin.expozy.com/login/demo-hotel",
+    "login_url": "https://devadmin.expozy.com/admin/login_demo.php"
 }
 ```
 
@@ -104,7 +104,7 @@ Authentication: Basic <saas_key>
 и я изпраща сам. Браузърът отива в админа вече влязъл.
 
 ```html
-<form id="demoLogin" method="POST" action="https://admin.expozy.com/admin/login_token.php">
+<form id="demoLogin" method="POST" action="https://devadmin.expozy.com/admin/login_demo.php">
     <input type="hidden" name="token" value="">
     <input type="hidden" name="project_name" value="">
     <input type="hidden" name="ip" value="">
@@ -120,6 +120,7 @@ f.ip.value = res.ip;
 f.submit();
 ```
 
+- Адресите винаги от отговора (`login_url`, `admin_url`), не хардкоднати — на 17.11.2026 се смениха на `devadmin.expozy.com` и `login_demo.php` (води направо в таблото на админа).
 - Стойностите се слагат през `.value`, не с конкатенация в HTML — токенът съдържа специални знаци.
 - Ако директният вход не мине, пращай потребителя на `admin_url` — там влиза с имейла и паролата си.
 - Покажи на потребителя, че демото **се възстановява всяка нощ**: промените по данните се губят, акаунтът остава.
