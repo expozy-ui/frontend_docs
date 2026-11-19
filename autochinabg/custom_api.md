@@ -412,7 +412,7 @@ POST/DELETE тялото е `application/x-www-form-urlencoded` или `multipar
 | `reserved` | 0/1 | маркер „резервирана" |
 | `hidden` | 0/1 | свалена от сайта |
 | `price` | float | цена (`type=reservation`) |
-| `auto_renew` | 0/1 | автоматично подновяване (`type=reservation`) |
+| `auto_renew` | 0/1 | автоматично подновяване с още 30 дни при изтичане (`type=reservation`). **По подразбиране `1`** — ако не се подаде, обявата се подновява; `0` я оставя да приключи. Във формата чекбоксът трябва да е отметнат по подразбиране |
 | `start_price`, `reserve_price`, `buy_now_price`, `bid_step` | float | (`type=auction`) |
 | `prebid_active` | 0/1 | (`type=auction`) |
 | `video_url` | string | линк към видео (алтернатива на качено видео) |
